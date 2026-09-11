@@ -5,8 +5,8 @@ import { formatVaeStatus } from '../lib/greeting.js'
 describe('formatVaeStatus', () => {
   it('joins label, plugin, and note', () => {
     assert.equal(
-      formatVaeStatus({ plugin: 'dsh-vae-plugin', label: 'vae', note: 'loaded' }),
-      '[vae] dsh-vae-plugin: loaded',
+      formatVaeStatus({ plugin: 'dsh-vae-status', label: 'vae', note: 'loaded' }),
+      '[vae] dsh-vae-status: loaded',
     )
   })
 })

@@ -1,6 +1,6 @@
 /**
  * Independent DeepSeek Harness bundle that registers `vae_status`.
- * Replace this tool with real work; keep the bundle manifest and patch layer.
+ * Replace this tool with real work, or add another directory under packages/.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
@@ -9,7 +9,7 @@ import { formatVaeStatus } from './greeting.ts'
 
 export { formatVaeStatus } from './greeting.ts'
 
-export const name = 'dsh-vae-plugin'
+export const name = 'dsh-vae-status'
 export const inject = ['tools']
 
 /** Bundle configuration. */
@@ -30,7 +30,7 @@ export const Config: Schema<Config> = Schema.object({
 export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'vae_status',
-    description: 'Report that the veaaae dsh-vae-plugin is loaded, and echo a short note.',
+    description: 'Report that the veaaae dsh-vae-status plugin is loaded, and echo a short note.',
     parameters: {
       note: {
         type: 'string',
@@ -51,7 +51,7 @@ export function apply(ctx: Context, config: Config): void {
     },
     execute(args) {
       return Promise.resolve({
-        plugin: 'dsh-vae-plugin',
+        plugin: 'dsh-vae-status',
         label: config.label,
         note: args.note ?? 'loaded',
       })

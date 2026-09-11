@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  packages/vae-status:
     devDependencies:
       tsdown:
         specifier: ^0.22.2
