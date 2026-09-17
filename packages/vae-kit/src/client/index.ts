@@ -3,7 +3,7 @@
  * @module dsh-vae-kit/client
  */
 
-import { createElement, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { createElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 /** Locale namespace owned by this plugin. */
 export const NS = 'vae-kit'
@@ -16,6 +16,7 @@ const RELOAD_PATH = '/api/vae-kit.reload'
 const ENABLE_PATH = '/api/vae-kit.enable'
 
 type ItemKind = 'mcp' | 'skill'
+type TabId = 'mcp' | 'skills'
 type Enablement = 'on' | 'off'
 type EffectiveMode = 'off' | 'global' | 'project'
 
@@ -56,6 +57,7 @@ const zh = {
   nav: 'MCP / Skills',
   title: '个人 MCP 与 Skill',
   intro: '货架在 dsh-vae-kit 的 kit/ 目录。这里只改开关：全局写入 ~/.dsh/extensions.yml，当前项目写入仓库的 .dsh/extensions.yml。同名 id 项目赢。',
+  tabs: 'MCP 与 Skills',
   reload: '重新加载',
   reloading: '加载中…',
   kitRoot: 'Kit 目录',
@@ -63,7 +65,7 @@ const zh = {
   projectFile: '项目开关',
   noProject: '没有打开的项目，项目开关不可用。',
   project: '当前项目',
-  mcp: 'MCP 服务器',
+  mcp: 'MCP',
   skills: 'Skills',
   empty: '目录是空的。',
   inherit: '跟随默认',
@@ -89,6 +91,7 @@ const en: Record<keyof typeof zh, string> = {
   nav: 'MCP / Skills',
   title: 'Personal MCP and Skills',
   intro: 'The catalog lives in this plugin’s kit/ directory. This page only flips switches: global writes ~/.dsh/extensions.yml; the current project writes that repo’s .dsh/extensions.yml. Same id: project wins.',
+  tabs: 'MCP and Skills',
   reload: 'Reload',
   reloading: 'Loading…',
   kitRoot: 'Kit directory',
@@ -96,7 +99,7 @@ const en: Record<keyof typeof zh, string> = {
   projectFile: 'Project file',
   noProject: 'No project is open, so project switches are disabled.',
   project: 'Current project',
-  mcp: 'MCP servers',
+  mcp: 'MCP',
   skills: 'Skills',
   empty: 'The catalog is empty.',
   inherit: 'Follow default',
@@ -199,6 +202,10 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [project, setProject] = useState<string>('')
+  const [tab, setTab] = useState<TabId>('mcp')
+  const [visited, setVisited] = useState<ReadonlySet<TabId>>(() => new Set(['mcp']))
+  const tabsId = useId()
+  const tabRefs = useRef<unknown[]>([])
 
   const load = useCallback(async (nextProject?: string) => {
     const query = nextProject === undefined || nextProject === '' ? '' : `?project=${encodeURIComponent(nextProject)}`
@@ -257,19 +264,36 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
     }
   }
 
-  const group = (title: CopyKey, items: ResolvedItemView[]): ReactNode => createElement('section', {
-    style: { display: 'flex', flexDirection: 'column', gap: 10 },
+  const selectTab = (next: TabId) => {
+    setTab(next)
+    setVisited((previous) => {
+      if (previous.has(next)) return previous
+      return new Set([...previous, next])
+    })
+  }
+
+  const tabs: { id: TabId; label: CopyKey }[] = [
+    { id: 'mcp', label: 'mcp' },
+    { id: 'skills', label: 'skills' },
+  ]
+
+  const panel = (kind: TabId, items: ResolvedItemView[]): ReactNode => createElement('div', {
+    key: kind,
+    id: `${tabsId}-panel-${kind}`,
+    role: 'tabpanel',
+    'aria-labelledby': `${tabsId}-tab-${kind}`,
+    hidden: tab !== kind,
+    style: { display: tab === kind ? 'flex' : 'none', flexDirection: 'column', gap: 10, minWidth: 0, paddingTop: 2 },
   },
-    createElement('h3', { style: { margin: 0, fontSize: 15 } }, t(title)),
     items.length === 0
-      ? createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-secondary)' } }, t('empty'))
+      ? createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' } }, t('empty'))
       : items.map(item => card(item, t, busy, project, enable)),
   )
 
-  return createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 820, paddingBottom: 24 } },
+  return createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 760, paddingBottom: 24, color: 'var(--dsw-alias-label-primary)' } },
     createElement('div', null,
-      createElement('h2', { style: { margin: '0 0 6px', fontSize: 18 } }, t('title')),
-      createElement('p', { style: { margin: 0, color: 'var(--dsw-alias-label-secondary)', fontSize: 13, lineHeight: 1.6 } }, t('intro')),
+      createElement('h2', { style: { margin: 0, fontSize: 18, fontWeight: 600 } }, t('title')),
+      createElement('p', { style: { margin: 0, color: 'var(--dsw-alias-label-tertiary)', fontSize: 13, lineHeight: 1.6 } }, t('intro')),
     ),
     createElement('div', { style: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' } },
       createElement('button', { type: 'button', disabled: busy, onClick: () => void reload(), style: buttonStyle(false, busy) },
@@ -324,8 +348,62 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
               },
             }, ...state.projects.map(row => createElement('option', { key: row.path, value: row.path }, `${row.title} — ${row.path}`))),
           ),
-        group('mcp', state.mcp),
-        group('skills', state.skills),
+        createElement('div', {
+          role: 'tablist',
+          'aria-label': t('tabs'),
+          style: {
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 22,
+            borderBottom: '0.5px solid var(--dsw-alias-border-l2)',
+            marginTop: 2,
+          },
+        }, ...tabs.map((row, index) => {
+          const selected = row.id === tab
+          return createElement('button', {
+            key: row.id,
+            ref: (element: unknown) => { tabRefs.current[index] = element },
+            id: `${tabsId}-tab-${row.id}`,
+            type: 'button',
+            role: 'tab',
+            'aria-selected': selected,
+            'aria-controls': `${tabsId}-panel-${row.id}`,
+            tabIndex: selected ? 0 : -1,
+            'data-active': selected ? 'true' : undefined,
+            onClick: () => selectTab(row.id),
+            onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+              let nextIndex: number
+              switch (event.key) {
+                case 'ArrowRight': nextIndex = (index + 1) % tabs.length; break
+                case 'ArrowLeft': nextIndex = (index - 1 + tabs.length) % tabs.length; break
+                case 'Home': nextIndex = 0; break
+                case 'End': nextIndex = tabs.length - 1; break
+                default: return
+              }
+              event.preventDefault()
+              const next = tabs[nextIndex]
+              if (next === undefined) return
+              selectTab(next.id)
+              const node = tabRefs.current[nextIndex] as { focus?: () => void } | null
+              node?.focus?.()
+            },
+            style: {
+              position: 'relative',
+              border: 0,
+              borderBottom: selected ? '2px solid var(--dsw-alias-label-primary)' : '2px solid transparent',
+              marginBottom: -1,
+              padding: '7px 1px 9px',
+              background: 'transparent',
+              color: selected ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-tertiary)',
+              font: 'inherit',
+              fontSize: 13,
+              lineHeight: '20px',
+              cursor: 'pointer',
+            },
+          }, t(row.label))
+        })),
+        visited.has('mcp') ? panel('mcp', state.mcp) : null,
+        visited.has('skills') ? panel('skills', state.skills) : null,
       ),
   )
 }

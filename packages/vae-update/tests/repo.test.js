@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -111,5 +111,13 @@ describe('listPatches', () => {
 
   it('treats an absent series directory as an empty series', () => {
     assert.deepEqual(listPatches('/nonexistent/vae-update-patches'), [])
+  })
+
+  it('maps both outside settings rows in the shipped nav-icon patch', () => {
+    const text = readFileSync(new URL('../patches/settings-nav-icon.patch', import.meta.url), 'utf8')
+    assert.match(text, /id === 'vae-update'/)
+    assert.match(text, /id === 'vae-kit'/)
+    assert.match(text, /IconDownloadOutline16/)
+    assert.match(text, /IconSkillOutline16/)
   })
 })

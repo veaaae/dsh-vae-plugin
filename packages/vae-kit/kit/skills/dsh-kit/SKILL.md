@@ -27,7 +27,7 @@ DSH does not scan `.dsh/mcp` by itself. Without `dsh-vae-kit`, MCP still means a
 
 ## Change enablement
 
-Use Settings → **MCP / Skills**, or edit the YAML and call reload.
+Use Settings → **MCP / Skills** (MCP and Skills are underlined tabs), or edit the YAML and call reload.
 
 ```yaml
 # ~/.dsh/extensions.yml

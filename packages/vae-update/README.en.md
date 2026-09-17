@@ -72,7 +72,7 @@ Every `*.patch` in the series directory is applied in filename order; an absent 
         patchesDir: /home/dsh-vae-plugin/packages/vae-update/patches
 ```
 
-The shipped `patches/settings-nav-icon.patch` gives the **Update** settings row a download glyph instead of sharing the gear with **General**: the host hardcodes its nav icons, so a section registered by an outside package cannot declare one. That patch goes stale, by design, if upstream rewrites `navIcon` in `SettingsRoot.tsx`.
+The shipped `patches/settings-nav-icon.patch` gives the **Update** settings row a download glyph and the **MCP / Skills** row the skill glyph, instead of sharing the gear with **General**: the host hardcodes its nav icons, so a section registered by an outside package cannot declare one. That patch goes stale, by design, if upstream rewrites `navIcon` in `SettingsRoot.tsx`.
 
 ## Where the paths come from
 

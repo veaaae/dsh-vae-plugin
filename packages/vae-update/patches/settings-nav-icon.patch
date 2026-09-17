@@ -1,5 +1,5 @@
 diff --git a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
-index 33ad30cb1b..705e8b55d8 100644
+index 33ad30cb1b..0000000000 100644
 --- a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
 +++ b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
 @@ -15,7 +15,7 @@ import clsx from 'clsx'
@@ -7,15 +7,16 @@ index 33ad30cb1b..705e8b55d8 100644
    ConnectionIndicator,
    IconAgentPresetOutline16, IconArchiveOutline20, IconCloseOutline16, IconDataOutline16,
 -  IconPersonalizationOutline16, IconSettingsOutline16,
-+  IconDownloadOutline16, IconPersonalizationOutline16, IconSettingsOutline16,
++  IconDownloadOutline16, IconPersonalizationOutline16, IconSettingsOutline16, IconSkillOutline16,
  } from '@deepseek-ai/dsh-client-ui-primitives'
  import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
  import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
-@@ -33,5 +33,7 @@ function navIcon(id: string) {
+@@ -33,5 +33,8 @@ function navIcon(id: string) {
    if (id === 'plugins') return <IconPersonalizationOutline16 className={css.navIcon} size={16} />
    // 20-native glyph in the rail's 16px icon slot, as on the Session row menu.
    if (id === 'archived-sessions') return <IconArchiveOutline20 className={css.navIcon} size={16} />
-+  // Update sections ship outside this repository and register a plain id.
++  // Outside packages register a plain id; the host maps those ids to glyphs here.
 +  if (id === 'vae-update') return <IconDownloadOutline16 className={css.navIcon} size={16} />
++  if (id === 'vae-kit') return <IconSkillOutline16 className={css.navIcon} size={16} />
    return <IconSettingsOutline16 className={css.navIcon} size={16} />
  }

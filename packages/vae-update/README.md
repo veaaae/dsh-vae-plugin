@@ -72,7 +72,7 @@ pnpm dsh plugin --profile web add github:veaaae/dsh-vae-plugin#path:packages/vae
         patchesDir: /home/dsh-vae-plugin/packages/vae-update/patches
 ```
 
-内置 `patches/settings-nav-icon.patch`：给设置导航里的「更新」换成下载图标，避免和「通用设置」共用同一个齿轮（宿主的图标映射是硬编码的，插件注册不了图标，只能这样打）。上游改了 `SettingsRoot.tsx` 的 `navIcon` 时这个补丁会失效，属预期。
+内置 `patches/settings-nav-icon.patch`：给设置导航里的「更新」换成下载图标、「MCP / Skills」换成 Skill 图标，避免和「通用设置」共用同一个齿轮（宿主的图标映射是硬编码的，插件注册不了图标，只能这样打）。上游改了 `SettingsRoot.tsx` 的 `navIcon` 时这个补丁会失效，属预期。
 
 ## 路径怎么来的
 

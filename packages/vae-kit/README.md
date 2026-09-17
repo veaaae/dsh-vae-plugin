@@ -16,7 +16,7 @@ allowBuilds:
   dsh-vae-kit: true
 ```
 
-装完重启 `dsh web`，打开设置 → **MCP / Skills**。
+装完重启 `dsh web`，打开设置 → **MCP / Skills**。页内用下划线 Tab 在 MCP 和 Skills 之间切换。侧栏图标由 `dsh-vae-update` 的 `patches/settings-nav-icon.patch` 写进宿主 `navIcon`（Skill 手册图标）；只装本包、不装更新插件时，这一行仍是默认齿轮。
 
 ## 它做什么
 

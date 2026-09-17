@@ -16,7 +16,7 @@ allowBuilds:
   dsh-vae-kit: true
 ```
 
-Restart `dsh web`, then open Settings → **MCP / Skills**.
+Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MCP and Skills with underlined tabs. The sidebar glyph comes from `dsh-vae-update`'s `patches/settings-nav-icon.patch` (the skill handbook icon). Installing this package without the update plugin leaves the row on the default gear.
 
 ## What it does
 
