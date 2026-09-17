@@ -1,6 +1,0 @@
-# Bundle layer applied when a profile lists `dsh-vae-status`.
-# Host-level insert: the tool registers on the global tools layer, so Web
-# sessions inherit it without copying a shipped agent preset.
-- insert:
-    - id: vae-status
-      name: dsh-vae-status

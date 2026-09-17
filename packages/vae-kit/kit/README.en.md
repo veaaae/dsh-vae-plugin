@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-MCP server declarations and Skill handbooks that `veaaae` actually uses, shipped with the `dsh-vae-kit` package. This is a **catalog**: it names what exists; it does not start processes. The repository-root `kit/` path is a symlink here.
+MCP server declarations and Skill handbooks that `veaaae` actually uses, shipped with the `dsh-vae-kit` package. This is a **catalog**: it names what exists; it does not start processes.
 
 Enablement is owned by the `dsh-vae-kit` plugin:
 

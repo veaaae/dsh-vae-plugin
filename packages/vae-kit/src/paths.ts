@@ -66,8 +66,8 @@ export function findGitRoot(start: string): string | undefined {
 }
 
 /**
- * Locate the kit directory: this package's `kit/` first (git subdirectory
- * installs only unpack this package), then `<gitRoot>/kit`.
+ * Locate this package's `kit/` directory. Git subdirectory installs unpack
+ * only this package, so the catalog must live next to `package.json`.
  * @returns an absolute kit directory, or empty when none is found.
  */
 export function detectKitRoot(): string {
@@ -75,10 +75,7 @@ export function detectKitRoot(): string {
   for (const kit of [resolve(here, '..', 'kit'), resolve(here, 'kit')]) {
     if (existsSync(join(kit, 'catalog.yml'))) return kit
   }
-  const root = findGitRoot(here)
-  if (root === undefined) return ''
-  const kit = join(root, 'kit')
-  return existsSync(join(kit, 'catalog.yml')) ? kit : ''
+  return ''
 }
 
 /** `name` from a checkout's root manifest; undefined when it cannot be read. */

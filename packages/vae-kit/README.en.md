@@ -20,7 +20,7 @@ Restart `dsh web`, then open Settings → **MCP / Skills**.
 
 ## What it does
 
-- Reads this package's `kit/catalog.yml`, `kit/mcp/<id>/server.yml`, and `kit/skills/<id>/SKILL.md` (the repository-root `kit/` path is a symlink here)
+- Reads this package's `kit/catalog.yml`, `kit/mcp/<id>/server.yml`, and `kit/skills/<id>/SKILL.md`
 - Global switches: `$DSH_HOME/extensions.yml`
 - Project switches: `<gitRoot>/.dsh/extensions.yml` (same id: project wins)
 - Registers enabled Skills as the `vae-kit` `ctx.skills` provider

@@ -5,7 +5,7 @@ description: How this personal MCP and Skill kit is laid out and enabled. Use wh
 
 # DSH kit
 
-This skill describes the personal catalog in the `dsh-vae-kit` package (`packages/vae-kit/kit/`; the repository-root `kit/` path is a symlink) and the manager plugin.
+This skill describes the personal catalog in the `dsh-vae-kit` package (`packages/vae-kit/kit/`) and the manager plugin.
 
 ## Two layers
 

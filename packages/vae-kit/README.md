@@ -20,7 +20,7 @@ allowBuilds:
 
 ## 它做什么
 
-- 读本包的 `kit/catalog.yml`、`kit/mcp/<id>/server.yml`、`kit/skills/<id>/SKILL.md`（仓库根的 `kit/` 是指向这里的符号链接）
+- 读本包的 `kit/catalog.yml`、`kit/mcp/<id>/server.yml`、`kit/skills/<id>/SKILL.md`
 - 全局开关：`$DSH_HOME/extensions.yml`
 - 项目开关：`<gitRoot>/.dsh/extensions.yml`（同名 id 项目赢）
 - 把启用的 Skill 注册成 `ctx.skills` 提供方 `vae-kit`

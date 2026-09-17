@@ -2,7 +2,7 @@
 
 中文 | [English](README.en.md)
 
-`veaaae` 常用的 MCP 服务器声明和 Skill 手册，随 `dsh-vae-kit` 包发布。这是**货架**：只描述有什么，不启动进程。仓库根目录的 `kit/` 是指向本目录的符号链接。
+`veaaae` 常用的 MCP 服务器声明和 Skill 手册，随 `dsh-vae-kit` 包发布。这是**货架**：只描述有什么，不启动进程。
 
 启用由 `dsh-vae-kit` 插件读取：
 

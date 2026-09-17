@@ -8,44 +8,42 @@ This repository is **not** a fork of `deepseek-ai/deepseek-harness`. Keep the of
 
 The root is a pnpm workspace, **not** an installable bundle. Each plugin is its own bundle under `packages/<name>/`, with its own `package.json`, `cordis.patch.yml`, and source, so you can install and remove them independently.
 
-The repo currently ships `dsh-vae-status`, a canary tool `vae_status` used to prove install and Web visibility.
-
 `dsh-vae-update` adds a Settings → **Updates** page that checks the official harness source checkout and this repository for new commits, then runs `git pull --ff-only`, `pnpm install`, and `pnpm run build` on demand.
 
-`dsh-vae-kit` is the personal MCP + Skill catalog and manager. The catalog lives in `packages/vae-kit/kit/` (the repository-root `kit/` path is a symlink). Settings → **MCP / Skills** enables each id globally (`~/.dsh/extensions.yml`) or per project (`<gitRoot>/.dsh/extensions.yml`).
+`dsh-vae-kit` is the personal MCP + Skill catalog and manager. The catalog lives in `packages/vae-kit/kit/`. Settings → **MCP / Skills** enables each id globally (`~/.dsh/extensions.yml`) or per project (`<gitRoot>/.dsh/extensions.yml`).
 
 ## Install one plugin
 
 From the harness checkout (after `pnpm install` / `pnpm run build`), add a local path:
 
 ```sh
-pnpm dsh plugin --profile web add /home/dsh-vae-plugin/packages/vae-status
+pnpm dsh plugin --profile web add /home/dsh-vae-plugin/packages/vae-kit
 ```
 
 From GitHub, install the subdirectory (the `#path:` suffix is required; do not install the repo root):
 
 ```sh
-pnpm dsh plugin --profile web add github:veaaae/dsh-vae-plugin#path:packages/vae-status
+pnpm dsh plugin --profile web add github:veaaae/dsh-vae-plugin#path:packages/vae-kit
 ```
 
 pnpm ≥10 blocks a git dependency's `prepare` script until you allow it. If the first GitHub install fails, add the printed package key to the profile's `pnpm-workspace.yaml`:
 
 ```yaml
 allowBuilds:
-  dsh-vae-status: true
+  dsh-vae-kit: true
 ```
 
-Then re-run the `add`. Restart `pnpm dsh web` after bundle membership changes. Ask the agent: `Use vae_status and tell me what it returned.`
+Then re-run the `add`. Restart `pnpm dsh web` after bundle membership changes.
 
 Remove one plugin:
 
 ```sh
-pnpm dsh plugin --profile web remove dsh-vae-status
+pnpm dsh plugin --profile web remove dsh-vae-kit
 ```
 
 ## Add another plugin
 
-Copy `packages/vae-status/`, then change these so they do not collide:
+Copy `packages/vae-update/`, then change these so they do not collide:
 
 1. Directory name `packages/<name>/`
 2. `package.json` `name` (for example `dsh-vae-<name>`)
@@ -61,12 +59,6 @@ For a plugin with a **Web UI**, follow `packages/vae-update/`: declare `"dsh": {
 
 ```
 packages/
-  vae-status/           canary bundle dsh-vae-status
-    src/index.ts
-    src/greeting.ts
-    cordis.patch.yml
-    tsdown.config.mjs
-    package.json
   vae-update/           update panel dsh-vae-update (host half + client half)
     src/index.ts
     src/repo.ts
@@ -82,7 +74,6 @@ packages/
     cordis.patch.yml
     tsdown.config.mjs
     package.json
-kit/                    -> packages/vae-kit/kit
 pnpm-workspace.yaml
 README.md               Chinese
 README.en.md            English
@@ -114,5 +105,5 @@ pnpm run build
 One package only:
 
 ```sh
-pnpm --filter dsh-vae-status test
+pnpm --filter dsh-vae-kit test
 ```
