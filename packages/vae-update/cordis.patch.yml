@@ -1,0 +1,17 @@
+# Bundle layer applied when a profile lists `dsh-vae-update`.
+#
+# One row covers both halves: the row's host module registers the
+# `/api/vae-update.*` routes, and the same package's `dsh.client` declaration
+# makes the client-module scanner serve `lib/client.js`, which contributes the
+# Settings page. No config is required — both checkouts are detected from the
+# running process and can be overridden per key when detection cannot find them:
+#
+#   - insert:
+#       - id: vae-update
+#         name: dsh-vae-update
+#         config:
+#           harnessRoot: /path/to/deepseek-harness
+#           pluginsRoot: /path/to/dsh-vae-plugin
+- insert:
+    - id: vae-update
+      name: dsh-vae-update
