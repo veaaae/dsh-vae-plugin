@@ -10,6 +10,10 @@
 
 当前已有 `dsh-vae-status`：探针工具 `vae_status`，用来验证安装和 Web 可见性。
 
+`dsh-vae-update`：设置 →「更新」页面，检查官方 Harness 源码 checkout 和本仓库有没有新提交，并一键执行 `git pull --ff-only` + `pnpm install` + `pnpm run build`。
+
+`dsh-vae-kit`：个人 MCP + Skill 货架和管理器。目录在 `packages/vae-kit/kit/`（仓库根的 `kit/` 指向它）。设置 →「MCP / Skills」按全局（`~/.dsh/extensions.yml`）或项目（`<gitRoot>/.dsh/extensions.yml`）开关启用。
+
 ## 安装某一个插件
 
 在 harness 源码目录（已执行过 `pnpm install` / `pnpm run build`）里，装本地路径：
@@ -51,6 +55,8 @@ pnpm dsh plugin --profile web remove dsh-vae-status
 
 每个包必须声明 `"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }`。没有这个字段时，`dsh plugin add` 只会装成普通依赖，并打印警告。
 
+要做**带 Web 界面**的插件，参考 `packages/vae-update/`：`package.json` 额外声明 `"dsh": { "client": { "platform": "web" } }`，在 `exports` 里暴露 `"./client"`，客户端半放 `src/client/index.ts`，由 tsdown 打成 `lib/client.js`——内容必须是 `window.__ModuleLoader__.load({ id: "<包名>", factory: (require) => {…} })` 的包装，只把模块表里的 `react` 等当作 external，其余全部内联。
+
 ## 目录
 
 ```
@@ -61,6 +67,22 @@ packages/
     cordis.patch.yml
     tsdown.config.mjs
     package.json
+  vae-update/           更新面板 dsh-vae-update（宿主半 + 客户端半）
+    src/index.ts
+    src/repo.ts
+    src/jobs.ts
+    src/exec.ts
+    src/client/index.ts
+    cordis.patch.yml
+    tsdown.config.mjs
+    package.json
+  vae-kit/              MCP / Skill 管理器 dsh-vae-kit（宿主半 + 客户端半 + kit/）
+    src/
+    kit/                个人 MCP 声明与 Skill 手册
+    cordis.patch.yml
+    tsdown.config.mjs
+    package.json
+kit/                    -> packages/vae-kit/kit
 pnpm-workspace.yaml
 README.md               中文
 README.en.md            English

@@ -1,0 +1,9 @@
+# MCP reference memory server. Override the JSONL path with MEMORY_FILE_PATH.
+serverName: memory
+transport: stdio
+command: npx
+args:
+  - -y
+  - '@modelcontextprotocol/server-memory'
+envFrom:
+  MEMORY_FILE_PATH: MEMORY_FILE_PATH

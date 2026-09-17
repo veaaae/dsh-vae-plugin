@@ -1,0 +1,8 @@
+# Playwright MCP. Enable per repository; a global install would start a
+# browser server for every session.
+serverName: playwright
+transport: stdio
+command: npx
+args:
+  - -y
+  - '@playwright/mcp@latest'

@@ -1,0 +1,39 @@
+# Personal MCP + Skill catalog. This file declares what exists in the kit.
+# It does not start servers. Enablement lives in ~/.dsh/extensions.yml
+# (global) and <gitRoot>/.dsh/extensions.yml (project). Same id: project wins.
+#
+# default:
+#   global  — treat as on for every session until a file says otherwise
+#   project — off until that repository's extensions.yml turns it on
+#   off     — off until a file turns it on
+
+mcp:
+  github:
+    title: GitHub
+    description: Issues, pull requests, and repository operations through the official GitHub MCP server.
+    default: off
+    tags: [vcs]
+  playwright:
+    title: Playwright
+    description: Browser automation for the current repository.
+    default: project
+    tags: [browser]
+  memory:
+    title: Memory
+    description: Local knowledge-graph memory through the MCP reference memory server.
+    default: off
+    tags: [memory]
+
+skills:
+  pr-review:
+    title: PR review
+    description: Review a pull request with a consistent checklist.
+    default: project
+  dsh-issue-triage:
+    title: DSH issue triage
+    description: Triage GitHub issues against DeepSeek Harness conventions.
+    default: global
+  dsh-kit:
+    title: DSH kit
+    description: How this personal MCP and Skill kit is laid out and enabled.
+    default: global

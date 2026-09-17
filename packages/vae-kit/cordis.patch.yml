@@ -1,0 +1,8 @@
+# Bundle layer applied when a profile lists `dsh-vae-kit`.
+#
+# Host half registers the kit skill provider, mounts enabled MCP clients, and
+# (when connection is present) the /api/vae-kit.* routes. The client half is
+# picked up from this package's dsh.client declaration.
+- insert:
+    - id: vae-kit
+      name: dsh-vae-kit

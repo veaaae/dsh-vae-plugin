@@ -1,0 +1,10 @@
+# Official GitHub MCP server. Put the token in the process environment or
+# $DSH_HOME/.credentials.yaml — never commit it here.
+serverName: github
+transport: stdio
+command: npx
+args:
+  - -y
+  - '@modelcontextprotocol/server-github'
+envFrom:
+  GITHUB_TOKEN: GITHUB_TOKEN

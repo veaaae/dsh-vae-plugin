@@ -10,6 +10,10 @@ The root is a pnpm workspace, **not** an installable bundle. Each plugin is its 
 
 The repo currently ships `dsh-vae-status`, a canary tool `vae_status` used to prove install and Web visibility.
 
+`dsh-vae-update` adds a Settings → **Updates** page that checks the official harness source checkout and this repository for new commits, then runs `git pull --ff-only`, `pnpm install`, and `pnpm run build` on demand.
+
+`dsh-vae-kit` is the personal MCP + Skill catalog and manager. The catalog lives in `packages/vae-kit/kit/` (the repository-root `kit/` path is a symlink). Settings → **MCP / Skills** enables each id globally (`~/.dsh/extensions.yml`) or per project (`<gitRoot>/.dsh/extensions.yml`).
+
 ## Install one plugin
 
 From the harness checkout (after `pnpm install` / `pnpm run build`), add a local path:
@@ -51,6 +55,8 @@ Copy `packages/vae-status/`, then change these so they do not collide:
 
 Each package must declare `"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }`. Without that key, `dsh plugin add` installs a plain dependency and prints a warning.
 
+For a plugin with a **Web UI**, follow `packages/vae-update/`: declare `"dsh": { "client": { "platform": "web" } }` as well, expose `"./client"` in `exports`, keep the client half in `src/client/index.ts`, and let tsdown emit `lib/client.js` — it must be a `window.__ModuleLoader__.load({ id: "<package name>", factory: (require) => {…} })` wrapper that treats only module-table entries such as `react` as external and inlines everything else.
+
 ## Layout
 
 ```
@@ -61,6 +67,22 @@ packages/
     cordis.patch.yml
     tsdown.config.mjs
     package.json
+  vae-update/           update panel dsh-vae-update (host half + client half)
+    src/index.ts
+    src/repo.ts
+    src/jobs.ts
+    src/exec.ts
+    src/client/index.ts
+    cordis.patch.yml
+    tsdown.config.mjs
+    package.json
+  vae-kit/              MCP / Skill manager dsh-vae-kit (host + client + kit/)
+    src/
+    kit/                personal MCP declarations and Skill handbooks
+    cordis.patch.yml
+    tsdown.config.mjs
+    package.json
+kit/                    -> packages/vae-kit/kit
 pnpm-workspace.yaml
 README.md               Chinese
 README.en.md            English
