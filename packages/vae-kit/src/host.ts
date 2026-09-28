@@ -15,7 +15,7 @@ import {
 } from './paths.ts'
 import { globalMcpIds, parseExtensions, projectMcpIds, resolveCatalog, setEnablement } from './resolve.ts'
 import type {
-  Enablement, ExtensionsDoc, KitCatalog, KitStateView, ResolvedItem, ResolvedItemView,
+  Enablement, ExtensionsDoc, KitCatalog, KitStateView, McpRuntimeStatus, ResolvedItem, ResolvedItemView,
 } from './types.ts'
 
 export const STATE_PATH = '/api/vae-kit.state'
@@ -137,7 +137,7 @@ interface HostState {
   globalDoc: ExtensionsDoc
   viewProject: string | null
   globalMounts: Map<string, FiberLike>
-  mcpStatus: Map<string, { status: 'idle' | 'mounted-global' | 'error'; error?: string }>
+  mcpStatus: Map<string, { status: McpRuntimeStatus; error?: string }>
   projectMounts: Map<AgentLike, Map<string, FiberLike>>
   projectMasks: Map<AgentLike, () => void>
   skillControl: SkillControl | null
@@ -246,20 +246,49 @@ async function resolvedFor(state: HostState, projectRoot: string | null): Promis
   }
 }
 
-function viewItems(items: readonly ResolvedItem[], state: HostState): ResolvedItemView[] {
+function addPrefixedTools(names: Set<string>, tools: ToolsLike | undefined, prefix: string, scope?: unknown): void {
+  if (tools?.schemas === undefined) return
+  try {
+    for (const tool of (scope === undefined ? tools.schemas() : tools.schemas(scope))) {
+      if (tool.name.startsWith(prefix)) names.add(tool.name)
+    }
+  } catch {
+    // schemas() can throw before the tool runtime is ready.
+  }
+}
+
+function collectTools(ctx: HostContext, prefix: string): string[] {
+  const names = new Set<string>()
+  addPrefixedTools(names, ctx.get('tools') as ToolsLike | undefined, prefix)
+  const agents = ctx.get('agents') as { list?: () => AgentLike[] } | undefined
+  if (agents?.list !== undefined) {
+    for (const agent of agents.list()) addPrefixedTools(names, agent.ctx.tools, prefix, agent)
+  }
+  return [...names].sort()
+}
+
+function viewItems(ctx: HostContext, items: readonly ResolvedItem[], state: HostState): ResolvedItemView[] {
   return items.map((item) => {
     if (item.kind !== 'mcp') return item
     const spec = state.catalog?.servers[item.id]
-    const status = state.mcpStatus.get(item.id) ?? { status: 'idle' as const }
+    const serverName = spec?.serverName ?? item.id
+    const recorded = state.mcpStatus.get(item.id)
+    let status: McpRuntimeStatus
+    if (item.effective === 'global') status = recorded?.status ?? 'idle'
+    else if (item.effective === 'project') {
+      status = recorded?.status === 'error' || recorded?.status === 'mounting' ? recorded.status : 'mounted-project'
+    } else status = 'idle'
+    const tools = status === 'idle' || status === 'error' || status === 'mounting'
+      ? []
+      : collectTools(ctx, TOOL_PREFIX(serverName))
     return {
       ...item,
       mcp: {
-        serverName: spec?.serverName ?? item.id,
+        serverName,
         transport: spec?.transport ?? 'stdio',
-        status: item.effective === 'global'
-          ? status.status
-          : item.effective === 'project' ? 'mounted-project' : 'idle',
-        ...status.error === undefined ? {} : { error: status.error },
+        status,
+        tools,
+        ...recorded?.error === undefined ? {} : { error: recorded.error },
       },
     }
   })
@@ -275,8 +304,8 @@ async function stateView(ctx: HostContext, state: HostState, projectRoot: string
     projectFile: projectRoot === null ? null : projectExtensionsPath(projectRoot),
     projectRoot,
     projects,
-    mcp: viewItems(resolved.mcp, state),
-    skills: viewItems(resolved.skills, state),
+    mcp: viewItems(ctx, resolved.mcp, state),
+    skills: viewItems(ctx, resolved.skills, state),
     warnings: state.catalog?.warnings ?? [],
     error: state.loadError,
   }
@@ -352,6 +381,7 @@ async function remountGlobal(ctx: HostContext, state: HostState, internals: Host
   }
   for (const id of wanted) {
     if (state.globalMounts.has(id)) continue
+    state.mcpStatus.set(id, { status: 'mounting' })
     try {
       const fiber = await ctx.plugin(mod, configFor(state, id))
       state.globalMounts.set(id, fiber)
@@ -361,6 +391,11 @@ async function remountGlobal(ctx: HostContext, state: HostState, internals: Host
       state.mcpStatus.set(id, { status: 'error', error: message })
       warn(ctx, `global MCP ${id}: ${message}`)
     }
+  }
+  for (const [id, recorded] of [...state.mcpStatus]) {
+    if (wanted.has(id) || state.globalMounts.has(id)) continue
+    if (recorded.status === 'mounted-project' || recorded.status === 'idle') continue
+    state.mcpStatus.set(id, { status: 'idle' })
   }
 }
 
@@ -427,11 +462,15 @@ async function remountProject(
       if (mod !== null) {
         for (const id of wanted) {
           if (mounts.has(id)) continue
+          state.mcpStatus.set(id, { status: 'mounting' })
           try {
             const fiber = await agent.ctx.plugin(mod, configFor(state, id))
             mounts.set(id, fiber)
+            state.mcpStatus.set(id, { status: 'mounted-project' })
           } catch (error) {
-            warn(ctx, `project MCP ${id}: ${error instanceof Error ? error.message : String(error)}`)
+            const message = error instanceof Error ? error.message : String(error)
+            state.mcpStatus.set(id, { status: 'error', error: message })
+            warn(ctx, `project MCP ${id}: ${message}`)
           }
         }
       }
@@ -544,11 +583,37 @@ function projectFromQuery(url: string, fallback: string | null): string | null {
   }
 }
 
+function markItemMounting(state: HostState, id: string): void {
+  if (state.globalMounts.has(id)) return
+  const current = state.mcpStatus.get(id)?.status
+  if (current === 'mounted-global' || current === 'mounted-project' || current === 'mounting') return
+  state.mcpStatus.set(id, { status: 'mounting' })
+}
+
+async function markResolvedMounting(state: HostState, projectRoot: string | null): Promise<void> {
+  const resolved = await resolvedFor(state, projectRoot)
+  for (const id of globalMcpIds(resolved.mcp)) markItemMounting(state, id)
+}
+
+function kickRuntime(
+  ctx: HostContext,
+  state: HostState,
+  internals: HostInternals,
+  mount: (work: () => Promise<void>) => Promise<void>,
+): void {
+  void mount(async () => {
+    await applyRuntime(ctx, state, internals)
+  }).catch((error: unknown) => {
+    warn(ctx, error instanceof Error ? error.message : String(error))
+  })
+}
+
 function registerRoutes(
   ctx: HostContext,
   state: HostState,
   internals: HostInternals,
   enqueue: (work: () => Promise<void>) => Promise<void>,
+  mount: (work: () => Promise<void>) => Promise<void>,
 ): void {
   const connection = connectionOf(ctx)
   if (connection === undefined) return
@@ -558,7 +623,7 @@ function registerRoutes(
     methods: ['GET'],
     requestBody: 'buffered',
     fetch: async (request) => {
-      await enqueue(async () => {})
+      if (state.catalog === null && state.loadError === null) await enqueue(async () => {})
       const project = projectFromQuery(request.url, state.viewProject ?? workspacesOf(ctx)[0]?.path ?? null)
       state.viewProject = project
       return respondJson(200, await stateView(ctx, state, project))
@@ -572,8 +637,9 @@ function registerRoutes(
     fetch: async (request) => {
       await enqueue(async () => {
         await refreshCatalog(state)
-        await applyRuntime(ctx, state, internals)
+        await markResolvedMounting(state, projectFromQuery(request.url, state.viewProject))
       })
+      kickRuntime(ctx, state, internals, mount)
       const project = projectFromQuery(request.url, state.viewProject)
       return respondJson(200, await stateView(ctx, state, project))
     },
@@ -620,7 +686,11 @@ function registerRoutes(
           await writeExtensionsFile(projectExtensionsPath(project), next)
           state.viewProject = project
         }
-        await applyRuntime(ctx, state, internals)
+        state.skillControl?.invalidate()
+        if (kind === 'mcp') {
+          if (value === 'on' && scope === 'global') markItemMounting(state, id)
+          kickRuntime(ctx, state, internals, mount)
+        }
       })
       if (error !== undefined) {
         const status = error === 'no-project' || state.catalog === null ? 409 : 400
@@ -668,9 +738,12 @@ export function apply(ctx: HostContext, config?: Config, internals: HostInternal
   registerSkillProvider(ctx, state)
 
   const enqueue = createQueue()
+  const mount = createQueue()
   void enqueue(async () => {
     await refreshCatalog(state)
-    await applyRuntime(ctx, state, internals)
+    await markResolvedMounting(state, null)
+  }).then(() => {
+    kickRuntime(ctx, state, internals, mount)
   }).catch((error: unknown) => {
     warn(ctx, error instanceof Error ? error.message : String(error))
   })
@@ -685,7 +758,7 @@ export function apply(ctx: HostContext, config?: Config, internals: HostInternal
       state.projectMasks.get(payload.agent)?.()
       state.projectMasks.delete(payload.agent)
     }, 'vae-kit: project MCP')
-    await enqueue(async () => {
+    await mount(async () => {
       await remountProject(ctx, state, payload.agent, internals)
     })
   }) as (...args: never[]) => unknown, { prepend: true })
@@ -700,7 +773,7 @@ export function apply(ctx: HostContext, config?: Config, internals: HostInternal
   const tryRegisterRoutes = (from: HostContext): void => {
     if (routesRegistered || connectionOf(from) === undefined) return
     routesRegistered = true
-    registerRoutes(from, state, internals, enqueue)
+    registerRoutes(from, state, internals, enqueue, mount)
   }
   tryRegisterRoutes(ctx)
   ctx.inject?.(['connection'], (wired) => tryRegisterRoutes(wired))

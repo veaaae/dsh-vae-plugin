@@ -16,7 +16,7 @@ allowBuilds:
   dsh-vae-kit: true
 ```
 
-装完重启 `dsh web`，打开设置 → **MCP / Skills**。页内用下划线 Tab 在 MCP 和 Skills 之间切换。侧栏图标由 `dsh-vae-update` 的 `patches/settings-nav-icon.patch` 写进宿主 `navIcon`（Skill 手册图标）；只装本包、不装更新插件时，这一行仍是默认齿轮。
+装完重启 `dsh web`，打开设置 → **MCP / Skills**。页内用下划线 Tab 在 MCP 和 Skills 之间切换；右侧开关控制当前是否启用，点开一行才列出已挂载的工具名，并可分别设置「所有会话」和「仅当前仓库」。侧栏图标由 `dsh-vae-update` 的 `patches/settings-nav-icon.patch` 写进宿主 `navIcon`（Skill 手册图标）；只装本包、不装更新插件时，这一行仍是默认齿轮。
 
 ## 它做什么
 
@@ -24,7 +24,7 @@ allowBuilds:
 - 全局开关：`$DSH_HOME/extensions.yml`
 - 项目开关：`<gitRoot>/.dsh/extensions.yml`（同名 id 项目赢）
 - 把启用的 Skill 注册成 `ctx.skills` 提供方 `vae-kit`
-- 全局启用的 MCP：在 Host 上 `plugin(@deepseek-ai/dsh-mcp-client)`
+- 全局启用的 MCP：在 Host 上 `plugin(@deepseek-ai/dsh-mcp-client)`；设置页不阻塞这次握手，卡片列出已发布的 `mcp__<serverName>__*` 工具
 - 项目启用的 MCP：在该 session 的 agent 作用域里挂；session 结束即拆
 - 项目关掉的全局 MCP：对该 agent `tools.restrict` 遮掉工具（stdio 进程仍在，直到全局也关）
 

@@ -1,8 +1,14 @@
 # Playwright MCP. Enable per repository; a global install would start a
 # browser server for every session.
+#
+# @playwright/mcp launches a headless browser when DISPLAY is absent, and the
+# dsh web service has no DISPLAY of its own. WSLg serves X11 as :0, so this is
+# what keeps each session's browser visible on the Windows desktop.
 serverName: playwright
 transport: stdio
 command: npx
 args:
   - -y
   - '@playwright/mcp@latest'
+env:
+  DISPLAY: ':0'

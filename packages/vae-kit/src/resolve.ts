@@ -60,7 +60,7 @@ function enablementMap(value: unknown, label: string): Record<string, Enablement
 /**
  * Apply catalog defaults, then the global file, then the project file.
  * Project `on`/`off` wins. Catalog `default: project` is off until the
- * project file turns it on. Unknown ids in either file are errors.
+ * project file turns it on. Ids that are no longer in the catalog are ignored.
  * @param catalog - loaded kit catalog.
  * @param globalDoc - ~/.dsh/extensions.yml
  * @param projectDoc - <gitRoot>/.dsh/extensions.yml, or undefined with no project.
@@ -71,24 +71,26 @@ export function resolveCatalog(
   globalDoc: ExtensionsDoc,
   projectDoc: ExtensionsDoc | undefined,
 ): { mcp: ResolvedItem[]; skills: ResolvedItem[] } {
-  assertKnownIds('mcp', globalDoc.mcp, catalog.mcp)
-  assertKnownIds('skills', globalDoc.skills, catalog.skills)
-  if (projectDoc !== undefined) {
-    assertKnownIds('mcp', projectDoc.mcp, catalog.mcp)
-    assertKnownIds('skills', projectDoc.skills, catalog.skills)
-  }
+  const globalMcp = knownOnly(globalDoc.mcp, catalog.mcp)
+  const globalSkills = knownOnly(globalDoc.skills, catalog.skills)
+  const projectMcp = projectDoc === undefined ? undefined : knownOnly(projectDoc.mcp, catalog.mcp)
+  const projectSkills = projectDoc === undefined ? undefined : knownOnly(projectDoc.skills, catalog.skills)
   return {
-    mcp: catalog.mcp.map(item => resolveItem(item, globalDoc.mcp[item.id], projectDoc?.mcp[item.id], projectDoc !== undefined)),
-    skills: catalog.skills.map(item => resolveItem(item, globalDoc.skills[item.id], projectDoc?.skills[item.id], projectDoc !== undefined)),
+    mcp: catalog.mcp.map(item => resolveItem(item, globalMcp[item.id], projectMcp?.[item.id], projectDoc !== undefined)),
+    skills: catalog.skills.map(item => resolveItem(item, globalSkills[item.id], projectSkills?.[item.id], projectDoc !== undefined)),
   }
 }
 
-function assertKnownIds(kind: string, doc: Readonly<Record<string, Enablement>>, items: readonly CatalogItem[]): void {
+function knownOnly(
+  doc: Readonly<Record<string, Enablement>>,
+  items: readonly CatalogItem[],
+): Readonly<Record<string, Enablement>> {
   const known = new Set(items.map(item => item.id))
-  const unknown = Object.keys(doc).filter(id => !known.has(id))
-  if (unknown.length > 0) {
-    throw new Error(`extensions.yml names unknown ${kind} id${unknown.length > 1 ? 's' : ''} ${unknown.join(', ')}`)
+  const next: Record<string, Enablement> = {}
+  for (const [id, value] of Object.entries(doc)) {
+    if (known.has(id)) next[id] = value
   }
+  return next
 }
 
 function resolveItem(

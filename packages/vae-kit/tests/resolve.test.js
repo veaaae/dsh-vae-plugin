@@ -65,11 +65,10 @@ describe('resolveCatalog', () => {
     assert.deepEqual(projectMcpIds(resolved.mcp), ['playwright'])
   })
 
-  it('rejects unknown ids instead of skipping them', () => {
-    assert.throws(
-      () => resolveCatalog(catalog(), parseExtensions('mcp:\n  nope: on\n'), undefined),
-      /unknown mcp id nope/,
-    )
+  it('ignores unknown ids instead of failing', () => {
+    const resolved = resolveCatalog(catalog(), parseExtensions('mcp:\n  nope: on\n'), undefined)
+    assert.equal(resolved.mcp.find(item => item.id === 'github').effective, 'global')
+    assert.equal(resolved.mcp.find(item => item.id === 'playwright').effective, 'off')
   })
 })
 

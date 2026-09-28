@@ -23,7 +23,8 @@ export {
 export { parseYaml, stringifyYaml } from './yaml.ts'
 export type {
   CatalogDefault, CatalogItem, EffectiveMode, Enablement, ExtensionsDoc, ItemKind,
-  KitCatalog, KitSkill, KitStateView, McpServerSpec, ResolvedItem, ResolvedItemView,
+  KitCatalog, KitSkill, KitStateView, McpRuntimeStatus, McpServerSpec, ResolvedItem,
+  ResolvedItemView,
 } from './types.ts'
 
 /** Stable Cordis plugin name. */

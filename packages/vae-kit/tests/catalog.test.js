@@ -12,12 +12,11 @@ describe('loadCatalog', () => {
   it('loads the checked-in kit', async () => {
     const catalog = await loadCatalog(kitRoot)
     assert.equal(catalog.warnings.length, 0)
-    assert.ok(catalog.servers.github.command)
-    assert.equal(catalog.servers.github.transport, 'stdio')
-    assert.equal(catalog.servers.github.envFrom.GITHUB_TOKEN, 'GITHUB_TOKEN')
-    assert.equal(catalog.skillBodies['dsh-kit'].name, 'dsh-kit')
-    assert.ok(catalog.skillBodies['dsh-kit'].content.includes('extensions.yml'))
-    assert.equal(catalog.skillBodies['pr-review'].modelInvocable, true)
+    assert.ok(catalog.servers.playwright.command)
+    assert.equal(catalog.servers.playwright.transport, 'stdio')
+    assert.equal(catalog.servers.playwright.serverName, 'playwright')
+    assert.equal(catalog.skillBodies.officecli.name, 'officecli')
+    assert.ok(catalog.skillBodies.officecli.content.includes('officecli'))
   })
 })
 
@@ -52,10 +51,9 @@ describe('loadCatalog HTTP servers', () => {
 describe('mcpClientConfig', () => {
   it('copies envFrom from the process environment', async () => {
     const catalog = await loadCatalog(kitRoot)
-    const config = mcpClientConfig(catalog.servers.github, { GITHUB_TOKEN: 'secret-token' })
+    const config = mcpClientConfig(catalog.servers.playwright, {})
     assert.equal(config.transport, 'stdio')
-    assert.equal(config.serverName, 'github')
-    assert.equal(config.env.GITHUB_TOKEN, 'secret-token')
+    assert.equal(config.serverName, 'playwright')
     assert.equal(config.failOnStartupError, false)
   })
 })

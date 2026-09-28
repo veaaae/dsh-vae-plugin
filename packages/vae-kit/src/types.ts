@@ -102,12 +102,21 @@ export interface KitStateView {
   readonly error: string | null
 }
 
+/** Runtime status of one MCP row on the Settings page. */
+export type McpRuntimeStatus =
+  | 'idle'
+  | 'mounting'
+  | 'mounted-global'
+  | 'mounted-project'
+  | 'error'
+
 /** One row on the Settings page, including MCP runtime status. */
 export interface ResolvedItemView extends ResolvedItem {
   readonly mcp?: {
     readonly serverName: string
     readonly transport: McpTransport
-    readonly status: 'idle' | 'mounted-global' | 'mounted-project' | 'error'
+    readonly status: McpRuntimeStatus
     readonly error?: string
+    readonly tools: readonly string[]
   }
 }

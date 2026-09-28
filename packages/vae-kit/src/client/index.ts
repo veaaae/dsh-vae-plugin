@@ -17,6 +17,7 @@ const ENABLE_PATH = '/api/vae-kit.enable'
 
 type ItemKind = 'mcp' | 'skill'
 type TabId = 'mcp' | 'skills'
+type FilterId = 'all' | 'on' | 'off'
 type Enablement = 'on' | 'off'
 type EffectiveMode = 'off' | 'global' | 'project'
 
@@ -35,8 +36,9 @@ interface ResolvedItemView {
   mcp?: {
     serverName: string
     transport: string
-    status: 'idle' | 'mounted-global' | 'mounted-project' | 'error'
+    status: 'idle' | 'mounting' | 'mounted-global' | 'mounted-project' | 'error'
     error?: string
+    tools: string[]
   }
 }
 
@@ -56,69 +58,79 @@ interface KitStateView {
 const zh = {
   nav: 'MCP / Skills',
   title: '个人 MCP 与 Skill',
-  intro: '货架在 dsh-vae-kit 的 kit/ 目录。这里只改开关：全局写入 ~/.dsh/extensions.yml，当前项目写入仓库的 .dsh/extensions.yml。同名 id 项目赢。',
+  intro: '右侧开关控制当前是否启用。点开一行可查看已挂载的工具，并分别设置「所有会话」和「仅当前仓库」。仓库设置优先。',
   tabs: 'MCP 与 Skills',
   reload: '重新加载',
   reloading: '加载中…',
-  kitRoot: 'Kit 目录',
-  globalFile: '全局开关',
-  projectFile: '项目开关',
-  noProject: '没有打开的项目，项目开关不可用。',
+  searchMcp: '搜索服务器',
+  searchSkills: '搜索技能',
+  filterAll: '全部',
+  filterOn: '已开启',
+  filterOff: '未开启',
+  empty: '目录是空的。',
+  emptyFilter: '没有符合筛选的项目。',
+  inherit: '跟随上层',
+  on: '开',
+  off: '关',
+  scopeGlobal: '所有会话',
+  scopeProject: '仅当前仓库',
+  badgeOff: '未启用',
+  badgeGlobal: '所有会话',
+  badgeProject: '仅此仓库',
+  noProject: '没有打开的项目，「仅当前仓库」不可用。',
   project: '当前项目',
   mcp: 'MCP',
   skills: 'Skills',
-  empty: '目录是空的。',
-  inherit: '跟随默认',
-  on: '开',
-  off: '关',
-  scopeGlobal: '全局',
-  scopeProject: '项目',
-  effectiveOff: '未启用',
-  effectiveGlobal: '全局启用',
-  effectiveProject: '仅此项目',
-  defaultGlobal: '目录默认：全局',
-  defaultProject: '目录默认：按项目',
-  defaultOff: '目录默认：关',
   statusIdle: '未挂载',
-  statusMounted: '已在 Host 挂载',
-  statusProject: '挂在当前项目的会话里',
+  statusMounting: '正在启动…',
+  statusMounted: '已挂载',
+  statusProject: '项目会话',
   statusError: '挂载失败',
+  toolsCount: '{count} 个工具',
+  noTools: '还没有工具名。',
+  expand: '展开',
+  collapse: '收起',
   warnings: '目录警告',
-  missingKit: '未检测到 kit 目录。在 bundle 的 config.kitRoot 里写绝对路径。',
+  missingKit: '未检测到 kit 目录。',
 } as const
 
 const en: Record<keyof typeof zh, string> = {
   nav: 'MCP / Skills',
   title: 'Personal MCP and Skills',
-  intro: 'The catalog lives in this plugin’s kit/ directory. This page only flips switches: global writes ~/.dsh/extensions.yml; the current project writes that repo’s .dsh/extensions.yml. Same id: project wins.',
+  intro: 'The switch on the right turns an item on or off for this view. Expand a row to see mounted tools and to set “every session” versus “this repo only”. The repo setting wins.',
   tabs: 'MCP and Skills',
   reload: 'Reload',
   reloading: 'Loading…',
-  kitRoot: 'Kit directory',
-  globalFile: 'Global file',
-  projectFile: 'Project file',
-  noProject: 'No project is open, so project switches are disabled.',
+  searchMcp: 'Search servers',
+  searchSkills: 'Search skills',
+  filterAll: 'All',
+  filterOn: 'On',
+  filterOff: 'Off',
+  empty: 'The catalog is empty.',
+  emptyFilter: 'Nothing matches this filter.',
+  inherit: 'Follow parent',
+  on: 'On',
+  off: 'Off',
+  scopeGlobal: 'Every session',
+  scopeProject: 'This repo only',
+  badgeOff: 'Off',
+  badgeGlobal: 'Every session',
+  badgeProject: 'This repo only',
+  noProject: 'No project is open, so the repo switch is disabled.',
   project: 'Current project',
   mcp: 'MCP',
   skills: 'Skills',
-  empty: 'The catalog is empty.',
-  inherit: 'Follow default',
-  on: 'On',
-  off: 'Off',
-  scopeGlobal: 'Global',
-  scopeProject: 'Project',
-  effectiveOff: 'Off',
-  effectiveGlobal: 'On globally',
-  effectiveProject: 'This project only',
-  defaultGlobal: 'Catalog default: global',
-  defaultProject: 'Catalog default: per project',
-  defaultOff: 'Catalog default: off',
   statusIdle: 'Not mounted',
-  statusMounted: 'Mounted on the Host',
-  statusProject: 'Mounted in this project’s sessions',
+  statusMounting: 'Starting…',
+  statusMounted: 'Mounted',
+  statusProject: 'Project session',
   statusError: 'Mount failed',
+  toolsCount: '{count} tools',
+  noTools: 'No tool names yet.',
+  expand: 'Expand',
+  collapse: 'Collapse',
   warnings: 'Catalog warnings',
-  missingKit: 'Kit directory not detected. Set config.kitRoot in the bundle patch.',
+  missingKit: 'Kit directory not detected.',
 }
 
 type CopyKey = keyof typeof zh
@@ -171,18 +183,6 @@ function buttonStyle(primary: boolean, disabled = false): Record<string, string 
   }
 }
 
-function effectiveLabel(mode: EffectiveMode, t: (key: CopyKey) => string): string {
-  if (mode === 'global') return t('effectiveGlobal')
-  if (mode === 'project') return t('effectiveProject')
-  return t('effectiveOff')
-}
-
-function defaultLabel(value: ResolvedItemView['default'], t: (key: CopyKey) => string): string {
-  if (value === 'global') return t('defaultGlobal')
-  if (value === 'project') return t('defaultProject')
-  return t('defaultOff')
-}
-
 function mcpStatus(item: ResolvedItemView, t: (key: CopyKey) => string): { text: string; color: string } {
   const status = item.mcp?.status
   if (status === 'mounted-global') {
@@ -191,10 +191,32 @@ function mcpStatus(item: ResolvedItemView, t: (key: CopyKey) => string): { text:
   if (status === 'mounted-project') {
     return { text: t('statusProject'), color: 'var(--dsw-alias-state-success-primary)' }
   }
+  if (status === 'mounting') {
+    return { text: t('statusMounting'), color: 'var(--dsw-alias-state-warn-primary)' }
+  }
   if (status === 'error') {
     return { text: `${t('statusError')}: ${item.mcp?.error ?? ''}`, color: 'var(--dsw-alias-state-error-primary)' }
   }
   return { text: t('statusIdle'), color: 'var(--dsw-alias-label-secondary)' }
+}
+
+function isMounting(view: KitStateView | null): boolean {
+  return view?.mcp.some(item => item.mcp?.status === 'mounting') === true
+}
+
+function scopeBadge(item: ResolvedItemView, t: (key: CopyKey) => string): string {
+  if (item.effective === 'global') return t('badgeGlobal')
+  if (item.effective === 'project') return t('badgeProject')
+  return t('badgeOff')
+}
+
+function matchesQuery(item: ResolvedItemView, query: string): boolean {
+  if (query === '') return true
+  const haystack = [
+    item.title, item.id, item.description, item.mcp?.serverName ?? '',
+    ...(item.mcp?.tools ?? []),
+  ].join(' ').toLowerCase()
+  return haystack.includes(query)
 }
 
 function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
@@ -203,13 +225,16 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
   const [busy, setBusy] = useState(false)
   const [project, setProject] = useState<string>('')
   const [tab, setTab] = useState<TabId>('mcp')
+  const [filter, setFilter] = useState<FilterId>('all')
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   const [visited, setVisited] = useState<ReadonlySet<TabId>>(() => new Set(['mcp']))
   const tabsId = useId()
   const tabRefs = useRef<unknown[]>([])
 
   const load = useCallback(async (nextProject?: string) => {
-    const query = nextProject === undefined || nextProject === '' ? '' : `?project=${encodeURIComponent(nextProject)}`
-    const view = await readJson<KitStateView>(`${STATE_PATH}${query}`)
+    const path = nextProject === undefined || nextProject === '' ? '' : `?project=${encodeURIComponent(nextProject)}`
+    const view = await readJson<KitStateView>(`${STATE_PATH}${path}`)
     setState(view)
     setProject(view.projectRoot ?? '')
     setError(view.error)
@@ -219,15 +244,23 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
     void load().catch((caught: unknown) => setError(messageOf(caught)))
   }, [load])
 
+  const mounting = isMounting(state)
+  useEffect(() => {
+    if (!mounting) return undefined
+    const timer = setInterval(() => {
+      void load(project === '' ? undefined : project).catch((caught: unknown) => setError(messageOf(caught)))
+    }, 1500)
+    return () => clearInterval(timer)
+  }, [load, project, mounting])
+
   const reload = async () => {
     setBusy(true)
     try {
-      const query = project === '' ? '' : `?project=${encodeURIComponent(project)}`
-      const view = await readJson<KitStateView>(`${RELOAD_PATH}${query}`, { method: 'POST', body: '{}' })
-      const refreshed = view
-      setState(refreshed)
-      setProject(refreshed.projectRoot ?? '')
-      setError(refreshed.error)
+      const path = project === '' ? '' : `?project=${encodeURIComponent(project)}`
+      const view = await readJson<KitStateView>(`${RELOAD_PATH}${path}`, { method: 'POST', body: '{}' })
+      setState(view)
+      setProject(view.projectRoot ?? '')
+      setError(view.error)
     } catch (caught) {
       setError(messageOf(caught))
     } finally {
@@ -266,10 +299,33 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
 
   const selectTab = (next: TabId) => {
     setTab(next)
+    setQuery('')
+    setFilter('all')
     setVisited((previous) => {
       if (previous.has(next)) return previous
       return new Set([...previous, next])
     })
+  }
+
+  const toggleExpanded = (key: string) => {
+    setExpanded((previous) => {
+      const next = new Set(previous)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const toggleEffective = (item: ResolvedItemView) => {
+    if (item.effective !== 'off') {
+      if (item.effective === 'project' || item.project === 'on') {
+        void enable(item.kind, item.id, 'project', 'off')
+        return
+      }
+      void enable(item.kind, item.id, 'global', 'off')
+      return
+    }
+    void enable(item.kind, item.id, 'global', 'on')
   }
 
   const tabs: { id: TabId; label: CopyKey }[] = [
@@ -277,29 +333,37 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
     { id: 'skills', label: 'skills' },
   ]
 
-  const panel = (kind: TabId, items: ResolvedItemView[]): ReactNode => createElement('div', {
-    key: kind,
-    id: `${tabsId}-panel-${kind}`,
-    role: 'tabpanel',
-    'aria-labelledby': `${tabsId}-tab-${kind}`,
-    hidden: tab !== kind,
-    style: { display: tab === kind ? 'flex' : 'none', flexDirection: 'column', gap: 10, minWidth: 0, paddingTop: 2 },
-  },
-    items.length === 0
-      ? createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' } }, t('empty'))
-      : items.map(item => card(item, t, busy, project, enable)),
-  )
+  const panel = (kind: TabId, items: ResolvedItemView[]): ReactNode => {
+    const needle = query.trim().toLowerCase()
+    const matched = items.filter(item => matchesQuery(item, needle))
+    const onItems = matched.filter(item => item.effective !== 'off')
+    const offItems = matched.filter(item => item.effective === 'off')
+    const shown = filter === 'on' ? onItems : filter === 'off' ? offItems : matched
+    const emptyKey: CopyKey = items.length === 0 ? 'empty' : 'emptyFilter'
 
-  return createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 760, paddingBottom: 24, color: 'var(--dsw-alias-label-primary)' } },
+    return createElement('div', {
+      key: kind,
+      id: `${tabsId}-panel-${kind}`,
+      role: 'tabpanel',
+      'aria-labelledby': `${tabsId}-tab-${kind}`,
+      hidden: tab !== kind,
+      style: { display: tab === kind ? 'flex' : 'none', flexDirection: 'column', gap: 12, minWidth: 0, paddingTop: 4 },
+    },
+      toolbar(t, kind, matched, onItems, offItems, filter, setFilter, query, setQuery, busy, project, state, switchProject, reload),
+      shown.length === 0
+        ? createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-tertiary)', padding: '28px 0', textAlign: 'center' } }, t(emptyKey))
+        : createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+          ...shown.map(item => row(
+            item, t, busy, project, expanded.has(`${item.kind}-${item.id}`),
+            () => toggleExpanded(`${item.kind}-${item.id}`), enable, () => toggleEffective(item),
+          ))),
+    )
+  }
+
+  return createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 920, paddingBottom: 24, color: 'var(--dsw-alias-label-primary)' } },
     createElement('div', null,
       createElement('h2', { style: { margin: 0, fontSize: 18, fontWeight: 600 } }, t('title')),
-      createElement('p', { style: { margin: 0, color: 'var(--dsw-alias-label-tertiary)', fontSize: 13, lineHeight: 1.6 } }, t('intro')),
-    ),
-    createElement('div', { style: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' } },
-      createElement('button', { type: 'button', disabled: busy, onClick: () => void reload(), style: buttonStyle(false, busy) },
-        busy ? t('reloading') : t('reload')),
-      state === null ? null : createElement('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } },
-        `${t('kitRoot')}: ${state.kitRoot || t('missingKit')}`),
+      createElement('p', { style: { margin: '4px 0 0', color: 'var(--dsw-alias-label-tertiary)', fontSize: 13, lineHeight: 1.6 } }, t('intro')),
     ),
     error === null
       ? null
@@ -315,9 +379,7 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
       }, error),
     state === null
       ? createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-secondary)' } }, t('reloading'))
-      : createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
-        fact(t, 'globalFile', state.globalFile),
-        fact(t, 'projectFile', state.projectFile ?? t('noProject')),
+      : createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 12 } },
         state.warnings.length === 0
           ? null
           : createElement('div', {
@@ -330,24 +392,6 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
               whiteSpace: 'pre-wrap',
             },
           }, `${t('warnings')}\n${state.warnings.join('\n')}`),
-        state.projects.length === 0
-          ? createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-secondary)' } }, t('noProject'))
-          : createElement('label', { style: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 } },
-            t('project'),
-            createElement('select', {
-              value: project,
-              disabled: busy,
-              onChange: (event: { target: { value: string } }) => void switchProject(event.target.value),
-              style: {
-                flex: 1,
-                padding: '4px 8px',
-                borderRadius: 8,
-                border: '1px solid var(--dsw-alias-border-l2)',
-                background: 'var(--dsw-alias-bg-layer-1)',
-                color: 'var(--dsw-alias-label-primary)',
-              },
-            }, ...state.projects.map(row => createElement('option', { key: row.path, value: row.path }, `${row.title} — ${row.path}`))),
-          ),
         createElement('div', {
           role: 'tablist',
           'aria-label': t('tabs'),
@@ -356,21 +400,19 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
             alignItems: 'flex-end',
             gap: 22,
             borderBottom: '0.5px solid var(--dsw-alias-border-l2)',
-            marginTop: 2,
           },
-        }, ...tabs.map((row, index) => {
-          const selected = row.id === tab
+        }, ...tabs.map((rowTab, index) => {
+          const selected = rowTab.id === tab
           return createElement('button', {
-            key: row.id,
+            key: rowTab.id,
             ref: (element: unknown) => { tabRefs.current[index] = element },
-            id: `${tabsId}-tab-${row.id}`,
+            id: `${tabsId}-tab-${rowTab.id}`,
             type: 'button',
             role: 'tab',
             'aria-selected': selected,
-            'aria-controls': `${tabsId}-panel-${row.id}`,
+            'aria-controls': `${tabsId}-panel-${rowTab.id}`,
             tabIndex: selected ? 0 : -1,
-            'data-active': selected ? 'true' : undefined,
-            onClick: () => selectTab(row.id),
+            onClick: () => selectTab(rowTab.id),
             onKeyDown: (event: { key: string; preventDefault: () => void }) => {
               let nextIndex: number
               switch (event.key) {
@@ -400,7 +442,7 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
               lineHeight: '20px',
               cursor: 'pointer',
             },
-          }, t(row.label))
+          }, t(rowTab.label))
         })),
         visited.has('mcp') ? panel('mcp', state.mcp) : null,
         visited.has('skills') ? panel('skills', state.skills) : null,
@@ -408,53 +450,212 @@ function KitSection({ t }: { t: (key: CopyKey) => string }): ReactNode {
   )
 }
 
-function fact(t: (key: CopyKey) => string, label: CopyKey, value: string): ReactNode {
-  return createElement('div', { style: { display: 'flex', gap: 8, fontSize: 12 } },
-    createElement('span', { style: { color: 'var(--dsw-alias-label-secondary)', minWidth: 72 } }, t(label)),
-    createElement('span', { style: { wordBreak: 'break-all' } }, value),
+function toolbar(
+  t: (key: CopyKey) => string,
+  kind: TabId,
+  matched: ResolvedItemView[],
+  onItems: ResolvedItemView[],
+  offItems: ResolvedItemView[],
+  filter: FilterId,
+  setFilter: (next: FilterId) => void,
+  query: string,
+  setQuery: (next: string) => void,
+  busy: boolean,
+  project: string,
+  state: KitStateView | null,
+  switchProject: (path: string) => Promise<void>,
+  reload: () => Promise<void>,
+): ReactNode {
+  const chips: { id: FilterId; label: CopyKey; count: number }[] = [
+    { id: 'all', label: 'filterAll', count: matched.length },
+    { id: 'on', label: 'filterOn', count: onItems.length },
+    { id: 'off', label: 'filterOff', count: offItems.length },
+  ]
+  return createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
+    createElement('div', { style: { display: 'flex', gap: 6 } }, ...chips.map(chip => {
+      const selected = chip.id === filter
+      return createElement('button', {
+        key: chip.id,
+        type: 'button',
+        onClick: () => setFilter(chip.id),
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 10px',
+          borderRadius: 999,
+          border: selected ? '1px solid var(--dsw-alias-label-primary)' : '1px solid var(--dsw-alias-border-l2)',
+          background: selected ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-bg-layer-1)',
+          color: selected ? 'var(--dsw-alias-bg-base)' : 'var(--dsw-alias-label-primary)',
+          fontSize: 12,
+          cursor: 'pointer',
+        },
+      }, t(chip.label), createElement('span', { style: { opacity: 0.72 } }, String(chip.count)))
+    })),
+    createElement('input', {
+      type: 'search',
+      value: query,
+      placeholder: t(kind === 'mcp' ? 'searchMcp' : 'searchSkills'),
+      onChange: (event: { target: { value: string } }) => setQuery(event.target.value),
+      style: {
+        flex: '1 1 160px',
+        minWidth: 140,
+        padding: '6px 10px',
+        borderRadius: 999,
+        border: '1px solid var(--dsw-alias-border-l2)',
+        background: 'var(--dsw-alias-bg-layer-1)',
+        color: 'var(--dsw-alias-label-primary)',
+        fontSize: 12,
+      },
+    }),
+    state === null || state.projects.length === 0
+      ? null
+      : createElement('select', {
+        value: project,
+        disabled: busy,
+        'aria-label': t('project'),
+        onChange: (event: { target: { value: string } }) => void switchProject(event.target.value),
+        style: {
+          maxWidth: 240,
+          padding: '6px 8px',
+          borderRadius: 8,
+          border: '1px solid var(--dsw-alias-border-l2)',
+          background: 'var(--dsw-alias-bg-layer-1)',
+          color: 'var(--dsw-alias-label-primary)',
+          fontSize: 12,
+        },
+      }, ...state.projects.map(row => createElement('option', { key: row.path, value: row.path }, `${row.title}`))),
+    createElement('button', { type: 'button', disabled: busy, onClick: () => void reload(), style: buttonStyle(false, busy) },
+      busy ? t('reloading') : t('reload')),
   )
 }
 
-function card(
+function badge(text: string, tone: 'muted' | 'ok' | 'warn' = 'muted'): ReactNode {
+  const color = tone === 'ok'
+    ? 'var(--dsw-alias-state-success-primary)'
+    : tone === 'warn'
+      ? 'var(--dsw-alias-state-warn-primary)'
+      : 'var(--dsw-alias-label-secondary)'
+  return createElement('span', { style: { fontSize: 11, color } }, text)
+}
+
+function switchControl(on: boolean, disabled: boolean, onClick: () => void, label: string): ReactNode {
+  return createElement('button', {
+    type: 'button',
+    role: 'switch',
+    'aria-checked': on,
+    'aria-label': label,
+    disabled,
+    onClick,
+    style: {
+      width: 40,
+      height: 22,
+      padding: 2,
+      borderRadius: 999,
+      border: 0,
+      cursor: disabled ? 'default' : 'pointer',
+      opacity: disabled ? 0.5 : 1,
+      background: on ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-border-l2)',
+      flex: '0 0 auto',
+    },
+  }, createElement('span', {
+    style: {
+      display: 'block',
+      width: 18,
+      height: 18,
+      borderRadius: 999,
+      background: 'var(--dsw-alias-bg-base)',
+      transform: on ? 'translateX(18px)' : 'translateX(0)',
+    },
+  }))
+}
+
+function row(
   item: ResolvedItemView,
   t: (key: CopyKey) => string,
   busy: boolean,
   project: string,
+  open: boolean,
+  onToggleOpen: () => void,
   enable: (kind: ItemKind, id: string, scope: 'global' | 'project', value: Enablement | 'inherit') => Promise<void>,
+  onToggle: () => void,
 ): ReactNode {
-  const color = item.effective === 'off'
-    ? 'var(--dsw-alias-label-secondary)'
-    : 'var(--dsw-alias-state-success-primary)'
+  const on = item.effective !== 'off'
   const status = item.kind === 'mcp' ? mcpStatus(item, t) : undefined
+  const tools = item.mcp?.tools ?? []
+  const mounted = item.mcp?.status === 'mounted-global' || item.mcp?.status === 'mounted-project'
   return createElement('div', {
     key: `${item.kind}-${item.id}`,
     style: {
       border: '1px solid var(--dsw-alias-border-l2)',
-      borderRadius: 10,
-      padding: 12,
+      borderRadius: 12,
+      padding: '12px 14px',
+      background: 'var(--dsw-alias-bg-layer-1)',
       display: 'flex',
       flexDirection: 'column',
       gap: 8,
     },
   },
-    createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' } },
-      createElement('strong', { style: { fontSize: 14 } }, item.title),
-      createElement('span', { style: { fontSize: 12, color } }, effectiveLabel(item.effective, t)),
+    createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-start' } },
+      createElement('button', {
+        type: 'button',
+        onClick: onToggleOpen,
+        'aria-expanded': open,
+        'aria-label': open ? t('collapse') : t('expand'),
+        style: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          border: '1px solid var(--dsw-alias-border-l2)',
+          background: on ? 'color-mix(in srgb, var(--dsw-alias-state-success-primary) 16%, var(--dsw-alias-bg-layer-1))' : 'var(--dsw-alias-bg-layer-2)',
+          color: on ? 'var(--dsw-alias-state-success-primary)' : 'var(--dsw-alias-label-secondary)',
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: 'pointer',
+          flex: '0 0 auto',
+        },
+      }, item.title.slice(0, 1).toUpperCase()),
+      createElement('div', { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 } },
+        createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
+          createElement('strong', { style: { fontSize: 14 } }, item.title),
+          badge(scopeBadge(item, t), on ? 'ok' : 'muted'),
+          item.kind !== 'mcp' || item.mcp === undefined ? null : badge(item.mcp.transport),
+          status === undefined || !on ? null : badge(status.text, item.mcp?.status === 'error' ? 'warn' : 'ok'),
+          item.kind !== 'mcp' || !mounted ? null : badge(t('toolsCount').replace('{count}', String(tools.length)), 'ok'),
+        ),
+        createElement('div', {
+          style: {
+            fontSize: 12,
+            color: 'var(--dsw-alias-label-secondary)',
+            lineHeight: 1.5,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          },
+        }, item.description),
+        item.error === undefined
+          ? null
+          : createElement('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' } }, item.error),
+      ),
+      switchControl(on, busy, onToggle, item.title),
     ),
-    createElement('div', { style: { fontSize: 13, color: 'var(--dsw-alias-label-secondary)', lineHeight: 1.5 } }, item.description),
-    createElement('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } },
-      `${item.id} · ${defaultLabel(item.default, t)}`),
-    item.error === undefined
-      ? null
-      : createElement('div', { style: { fontSize: 12, color: 'var(--dsw-alias-state-error-primary)' } }, item.error),
-    status === undefined
-      ? null
-      : createElement('div', { style: { fontSize: 12, color: status.color } },
-        `${item.mcp?.serverName ?? ''} · ${status.text}`),
-    createElement('div', { style: { display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 } },
-      toggles(t('scopeGlobal'), item.global, busy, value => void enable(item.kind, item.id, 'global', value), t),
-      toggles(t('scopeProject'), item.project ?? 'inherit', busy || project === '', value => void enable(item.kind, item.id, 'project', value), t),
-    ),
+    open
+      ? createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 48 } },
+        item.kind !== 'mcp' || !mounted
+          ? null
+          : createElement('div', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)', lineHeight: 1.5 } },
+            tools.length === 0
+              ? t('noTools')
+              : createElement('ul', {
+                style: { margin: 0, paddingLeft: 18, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+              }, ...tools.map(name => createElement('li', { key: name }, name)))),
+        createElement('div', { style: { display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 } },
+          toggles(t('scopeGlobal'), item.global, busy, value => void enable(item.kind, item.id, 'global', value), t),
+          toggles(t('scopeProject'), item.project ?? 'inherit', busy || project === '', value => void enable(item.kind, item.id, 'project', value), t),
+        ),
+      )
+      : null,
   )
 }
 

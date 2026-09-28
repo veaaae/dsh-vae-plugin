@@ -36,9 +36,8 @@ skills: {}
 
   it('parses the checked-in catalog.yml', async () => {
     const doc = parseYaml(await readFile(join(kitRoot, 'catalog.yml'), 'utf8'))
-    assert.equal(doc.mcp.github.default, 'off')
     assert.equal(doc.mcp.playwright.default, 'project')
-    assert.deepEqual(doc.mcp.github.tags, ['vcs'])
-    assert.equal(doc.skills['dsh-kit'].default, 'global')
+    assert.deepEqual(doc.mcp.playwright.tags, ['browser'])
+    assert.equal(doc.skills.officecli.default, 'global')
   })
 })

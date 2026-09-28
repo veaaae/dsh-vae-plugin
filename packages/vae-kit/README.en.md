@@ -16,7 +16,7 @@ allowBuilds:
   dsh-vae-kit: true
 ```
 
-Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MCP and Skills with underlined tabs. The sidebar glyph comes from `dsh-vae-update`'s `patches/settings-nav-icon.patch` (the skill handbook icon). Installing this package without the update plugin leaves the row on the default gear.
+Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MCP and Skills with underlined tabs. The switch on each row turns the item on or off; expand a mounted MCP row to list its tools and to set “every session” versus “this repo only”. The sidebar glyph comes from `dsh-vae-update`'s `patches/settings-nav-icon.patch` (the skill handbook icon). Installing this package without the update plugin leaves the row on the default gear.
 
 ## What it does
 
@@ -24,7 +24,7 @@ Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MC
 - Global switches: `$DSH_HOME/extensions.yml`
 - Project switches: `<gitRoot>/.dsh/extensions.yml` (same id: project wins)
 - Registers enabled Skills as the `vae-kit` `ctx.skills` provider
-- Global MCP: `plugin(@deepseek-ai/dsh-mcp-client)` on the Host
+- Global MCP: `plugin(@deepseek-ai/dsh-mcp-client)` on the Host; the Settings page does not wait for that handshake and lists published `mcp__<serverName>__*` tools
 - Project MCP: mounted in that session's agent scope and disposed with the session
 - A project that turns a global MCP off masks those tools with `tools.restrict` (the stdio process stays until it is off globally too)
 

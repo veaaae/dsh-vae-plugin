@@ -17,7 +17,7 @@
 
 ```
 catalog.yml                 id、简介、建议默认作用域
-mcp/<id>/server.yml         一台 MCP 的 transport / command / envFrom
+mcp/<id>/server.yml         一台 MCP 的 transport / command / env / envFrom
 skills/<id>/SKILL.md        标准 DSH skill bundle
 ```
 
@@ -33,3 +33,5 @@ pnpm dsh plugin --profile web add /home/dsh-vae-plugin/packages/vae-kit
 ```
 
 装完重启 `dsh web`，打开设置 → **MCP / Skills**。
+
+当前货架：Playwright（MCP，建议按仓库开）和 officecli（Skill，建议所有会话开）。

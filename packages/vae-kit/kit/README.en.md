@@ -17,7 +17,7 @@ The same id: **project wins**. Do not commit secrets.
 
 ```
 catalog.yml                 ids, blurbs, suggested default scope
-mcp/<id>/server.yml         one MCP transport / command / envFrom
+mcp/<id>/server.yml         one MCP transport / command / env / envFrom
 skills/<id>/SKILL.md        a standard DSH skill bundle
 ```
 
@@ -33,3 +33,5 @@ pnpm dsh plugin --profile web add /home/dsh-vae-plugin/packages/vae-kit
 ```
 
 Restart `dsh web`, then open Settings → **MCP / Skills**.
+
+The catalog currently ships Playwright (MCP, suggested per repo) and officecli (Skill, suggested for every session).

@@ -14,11 +14,12 @@ function fakeContext() {
   const plugins = []
   const created = []
   const toolsChange = []
-  return {
+  const ctx = {
     routes,
     providers,
     plugins,
     created,
+    onPlugin: undefined,
     get(name) {
       if (name === 'connection') return this.connection
       if (name === 'skills') return this.skills
@@ -37,6 +38,7 @@ function fakeContext() {
     },
     plugin: async (mod, config) => {
       plugins.push({ mod, config })
+      if (typeof ctx.onPlugin === 'function') await ctx.onPlugin(config)
       return { dispose: async () => {} }
     },
     effect: (callback) => callback(),
@@ -47,6 +49,7 @@ function fakeContext() {
     },
     inject: () => {},
   }
+  return ctx
 }
 
 const stubMcp = {
@@ -67,6 +70,15 @@ async function waitFor(route, request = new Request('http://dsh.local/api/vae-ki
   throw new Error('kit state never loaded')
 }
 
+async function waitUntil(route, predicate, request = new Request('http://dsh.local/api/vae-kit.state')) {
+  for (let i = 0; i < 50; i++) {
+    const body = await (await route.fetch(request)).json()
+    if (predicate(body)) return body
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  throw new Error('kit state never matched')
+}
+
 describe('detectKitRoot', () => {
   it('finds the package kit directory', () => {
     assert.equal(detectKitRoot(), kitRoot)
@@ -81,14 +93,11 @@ describe('apply', () => {
     const state = ctx.routes.get(`GET ${STATE_PATH}`)
     const body = await waitFor(state)
     assert.equal(body.error, null)
-    const github = body.mcp.find(item => item.id === 'github')
-    assert.equal(github.effective, 'off')
     const playwright = body.mcp.find(item => item.id === 'playwright')
     assert.equal(playwright.effective, 'off')
     assert.equal(ctx.providers[0].name, 'vae-kit')
     const skills = await ctx.providers[0].list({ cwd: dshHome })
-    assert.ok(skills.some(skill => skill.name === 'dsh-kit'))
-    assert.ok(!skills.some(skill => skill.name === 'pr-review'))
+    assert.ok(skills.some(skill => skill.name === 'officecli'))
     assert.equal(ctx.plugins.length, 0)
   })
 
@@ -99,15 +108,63 @@ describe('apply', () => {
     const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
     const response = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
-      body: JSON.stringify({ kind: 'skill', id: 'dsh-kit', scope: 'global', value: 'off' }),
+      body: JSON.stringify({ kind: 'skill', id: 'officecli', scope: 'global', value: 'off' }),
     }))
     const body = await response.json()
     assert.equal(response.status, 200)
-    assert.equal(body.skills.find(item => item.id === 'dsh-kit').effective, 'off')
+    assert.equal(body.skills.find(item => item.id === 'officecli').effective, 'off')
     const skills = await ctx.providers[0].list({})
-    assert.ok(!skills.some(skill => skill.name === 'dsh-kit'))
+    assert.ok(!skills.some(skill => skill.name === 'officecli'))
     const written = await readFile(join(dshHome, 'extensions.yml'), 'utf8')
-    assert.match(written, /dsh-kit: off/)
+    assert.match(written, /officecli: off/)
+  })
+
+  it('returns kit state while a slow MCP mount is still running', async () => {
+    const dshHome = await mkdtemp(join(tmpdir(), 'vae-kit-'))
+    const ctx = fakeContext()
+    let release
+    const blocked = new Promise((resolve) => { release = resolve })
+    ctx.onPlugin = async () => { await blocked }
+    apply(ctx, { kitRoot, dshHome }, stubMcp)
+    const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
+    const response = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
+    }))
+    const body = await response.json()
+    assert.equal(response.status, 200)
+    assert.equal(body.mcp.find(item => item.id === 'playwright').mcp.status, 'mounting')
+    const during = await (await ctx.routes.get(`GET ${STATE_PATH}`).fetch(new Request('http://dsh.local/api/vae-kit.state'))).json()
+    assert.equal(during.mcp.find(item => item.id === 'playwright').mcp.status, 'mounting')
+    assert.deepEqual(during.mcp.find(item => item.id === 'playwright').mcp.tools, [])
+    release()
+    const after = await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), body => body.mcp.find(item => item.id === 'playwright').mcp.status === 'mounted-global')
+    assert.equal(after.mcp.find(item => item.id === 'playwright').mcp.status, 'mounted-global')
+  })
+
+  it('lists published MCP tool names after a global mount', async () => {
+    const dshHome = await mkdtemp(join(tmpdir(), 'vae-kit-'))
+    const ctx = fakeContext()
+    const originalGet = ctx.get.bind(ctx)
+    ctx.get = (name) => {
+      if (name === 'tools') {
+        return {
+          schemas: () => [
+            { name: 'mcp__playwright__browser_navigate' },
+            { name: 'bash' },
+          ],
+        }
+      }
+      return originalGet(name)
+    }
+    apply(ctx, { kitRoot, dshHome }, stubMcp)
+    const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
+    await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
+    }))
+    const body = await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), view => view.mcp.find(item => item.id === 'playwright').mcp.status === 'mounted-global')
+    assert.deepEqual(body.mcp.find(item => item.id === 'playwright').mcp.tools, ['mcp__playwright__browser_navigate'])
   })
 
   it('mounts a globally enabled MCP through the client plugin', async () => {
@@ -117,14 +174,16 @@ describe('apply', () => {
     const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
     const response = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
-      body: JSON.stringify({ kind: 'mcp', id: 'github', scope: 'global', value: 'on' }),
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
     }))
     const body = await response.json()
     assert.equal(response.status, 200)
-    assert.equal(body.mcp.find(item => item.id === 'github').effective, 'global')
-    assert.equal(body.mcp.find(item => item.id === 'github').mcp.status, 'mounted-global')
+    assert.equal(body.mcp.find(item => item.id === 'playwright').effective, 'global')
+    assert.ok(['mounting', 'mounted-global'].includes(body.mcp.find(item => item.id === 'playwright').mcp.status))
+    const after = await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), view => view.mcp.find(item => item.id === 'playwright').mcp.status === 'mounted-global')
+    assert.equal(after.mcp.find(item => item.id === 'playwright').mcp.status, 'mounted-global')
     assert.equal(ctx.plugins.length, 1)
-    assert.equal(ctx.plugins[0].config.serverName, 'github')
+    assert.equal(ctx.plugins[0].config.serverName, 'playwright')
     assert.equal(ctx.plugins[0].config.failOnStartupError, false)
   })
 
@@ -135,11 +194,13 @@ describe('apply', () => {
     const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
     const response = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
-      body: JSON.stringify({ kind: 'mcp', id: 'github', scope: 'global', value: 'on' }),
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
     }))
     const body = await response.json()
-    assert.equal(body.mcp.find(item => item.id === 'github').mcp.status, 'error')
-    assert.match(body.mcp.find(item => item.id === 'github').mcp.error, /dsh-mcp-client/)
+    assert.ok(['mounting', 'error'].includes(body.mcp.find(item => item.id === 'playwright').mcp.status))
+    const after = await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), view => view.mcp.find(item => item.id === 'playwright').mcp.status === 'error')
+    assert.equal(after.mcp.find(item => item.id === 'playwright').mcp.status, 'error')
+    assert.match(after.mcp.find(item => item.id === 'playwright').mcp.error, /dsh-mcp-client/)
     assert.equal(ctx.plugins.length, 0)
   })
 
@@ -207,10 +268,11 @@ describe('apply', () => {
     assert.equal(response.status, 200)
     assert.equal(body.mcp.find(item => item.id === 'playwright').effective, 'project')
     assert.equal(ctx.plugins.length, 0)
+    await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), () => agentPlugins.length === 1)
     assert.equal(agentPlugins.length, 1)
     assert.equal(agentPlugins[0].config.serverName, 'playwright')
     const skills = await ctx.providers[0].list({ cwd: project })
-    assert.ok(!skills.some(skill => skill.name === 'pr-review'))
+    assert.ok(skills.some(skill => skill.name === 'officecli'))
   })
 
   it('unmounts a global MCP when turned off', async () => {
@@ -225,15 +287,17 @@ describe('apply', () => {
     const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
     await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
-      body: JSON.stringify({ kind: 'mcp', id: 'github', scope: 'global', value: 'on' }),
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
     }))
     const response = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
-      body: JSON.stringify({ kind: 'mcp', id: 'github', scope: 'global', value: 'off' }),
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'off' }),
     }))
     const body = await response.json()
+    const after = await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), view => view.mcp.find(item => item.id === 'playwright').mcp.status === 'idle')
     assert.equal(disposed, 1)
-    assert.equal(body.mcp.find(item => item.id === 'github').mcp.status, 'idle')
+    assert.equal(after.mcp.find(item => item.id === 'playwright').mcp.status, 'idle')
+    assert.equal(body.mcp.find(item => item.id === 'playwright').effective, 'off')
   })
 
   it('masks a globally mounted MCP when the project turns it off', async () => {
@@ -249,7 +313,7 @@ describe('apply', () => {
         effect: (callback) => callback(),
         get(name) { return name === 'tools' ? this.tools : undefined },
         tools: {
-          schemas: () => [{ name: 'mcp__github__list_issues' }],
+          schemas: () => [{ name: 'mcp__playwright__browser_navigate' }],
           restrict({ deny }) {
             lastDeny = [...deny]
             return () => {}
@@ -266,35 +330,36 @@ describe('apply', () => {
     const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
     await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
-      body: JSON.stringify({ kind: 'mcp', id: 'github', scope: 'global', value: 'on' }),
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
     }))
     const response = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',
       body: JSON.stringify({
-        kind: 'mcp', id: 'github', scope: 'project', value: 'off', project,
+        kind: 'mcp', id: 'playwright', scope: 'project', value: 'off', project,
       }),
     }))
     const body = await response.json()
     assert.equal(response.status, 200)
-    assert.equal(body.mcp.find(item => item.id === 'github').effective, 'off')
+    assert.equal(body.mcp.find(item => item.id === 'playwright').effective, 'off')
     assert.equal(ctx.plugins.length, 1)
-    assert.deepEqual(lastDeny, ['mcp__github__list_issues'])
+    await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), () => lastDeny.includes('mcp__playwright__browser_navigate'))
+    assert.deepEqual(lastDeny, ['mcp__playwright__browser_navigate'])
   })
 
-  it('lists a project skill when the project file turns it on', async () => {
+  it('hides a default-on skill when the project file turns it off', async () => {
     const dshHome = await mkdtemp(join(tmpdir(), 'vae-kit-'))
     const project = await mkdtemp(join(tmpdir(), 'vae-kit-proj-'))
     await mkdir(join(project, '.git'))
     await mkdir(join(project, '.dsh'), { recursive: true })
-    await writeFile(join(project, '.dsh', 'extensions.yml'), 'skills:\n  pr-review: on\n')
+    await writeFile(join(project, '.dsh', 'extensions.yml'), 'skills:\n  officecli: off\n')
     const ctx = fakeContext()
     apply(ctx, { kitRoot, dshHome }, stubMcp)
     await waitFor(ctx.routes.get(`GET ${STATE_PATH}`))
     const skills = await ctx.providers[0].list({ cwd: project })
-    assert.ok(skills.some(skill => skill.name === 'pr-review'))
+    assert.ok(!skills.some(skill => skill.name === 'officecli'))
   })
 
-  it('rejects an unknown id on enable and on reload', async () => {
+  it('ignores unknown ids in extensions.yml and rejects them on enable', async () => {
     const dshHome = await mkdtemp(join(tmpdir(), 'vae-kit-'))
     await mkdir(dshHome, { recursive: true })
     await writeFile(join(dshHome, 'extensions.yml'), 'mcp:\n  nope: on\n')
@@ -302,7 +367,7 @@ describe('apply', () => {
     apply(ctx, { kitRoot, dshHome }, stubMcp)
     const reload = ctx.routes.get(`POST ${RELOAD_PATH}`)
     const body = await (await reload.fetch(new Request('http://dsh.local/api/vae-kit.reload', { method: 'POST', body: '{}' }))).json()
-    assert.match(body.error ?? '', /unknown mcp id nope/)
+    assert.equal(body.error, null)
     const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
     const denied = await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
       method: 'POST',

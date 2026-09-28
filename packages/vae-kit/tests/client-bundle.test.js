@@ -124,7 +124,24 @@ describe('client bundle', () => {
         projectFile: null,
         projectRoot: null,
         projects: [],
-        mcp: [],
+        mcp: [{
+          kind: 'mcp',
+          id: 'playwright',
+          title: 'Playwright',
+          description: 'Browser automation',
+          default: 'project',
+          tags: [],
+          global: 'on',
+          project: null,
+          effective: 'global',
+          enabled: true,
+          mcp: {
+            serverName: 'playwright',
+            transport: 'stdio',
+            status: 'mounted-global',
+            tools: ['mcp__playwright__browser_navigate', 'mcp__playwright__browser_snapshot'],
+          },
+        }],
         skills: [],
         warnings: [],
         error: null,
@@ -150,6 +167,32 @@ describe('client bundle', () => {
       assert.ok(roles.includes('tablist'), 'expected MCP/Skills tablist after state loads')
       assert.deepEqual(roles.filter(role => role === 'tab'), ['tab', 'tab'])
       assert.deepEqual(labels, ['MCP', 'Skills'])
+      const collectText = (node) => {
+        const texts = []
+        walk(node, (item) => {
+          for (const child of item.children.flat()) {
+            if (typeof child === 'string') texts.push(child)
+          }
+        })
+        return texts
+      }
+      const first = collectText(rendered)
+      assert.ok(first.includes('全部'))
+      assert.ok(first.includes('已开启'))
+      assert.ok(first.includes('未开启'))
+      assert.ok(first.includes('Playwright'))
+      assert.ok(first.includes('2 个工具'))
+      assert.ok(!first.includes('mcp__playwright__browser_navigate'))
+      let expander
+      walk(rendered, (node) => {
+        if (node.props?.['aria-label'] === '展开') expander = node
+      })
+      assert.ok(expander, 'expected an expand control on the Playwright row')
+      expander.props.onClick()
+      rendered = render(element.type, element.props)
+      const expanded = collectText(rendered)
+      assert.ok(expanded.includes('mcp__playwright__browser_navigate'))
+      assert.ok(expanded.includes('mcp__playwright__browser_snapshot'))
     } finally {
       globalThis.fetch = originalFetch
     }
