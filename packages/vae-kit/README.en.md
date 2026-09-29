@@ -16,7 +16,7 @@ allowBuilds:
   dsh-vae-kit: true
 ```
 
-Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MCP and Skills with underlined tabs. The switch on each row turns the item on or off; expand a mounted MCP row to list its tools and to set “every session” versus “this repo only”. The sidebar glyph comes from `dsh-vae-update`'s `patches/settings-nav-icon.patch` (the skill handbook icon). Installing this package without the update plugin leaves the row on the default gear.
+Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MCP and Skills with underlined tabs. Filters are All / On / Off; the list is split into Global and Project, with the project picker beside the Project heading. Expand a mounted MCP row to list its tools. The sidebar glyph comes from `dsh-vae-update`'s `patches/settings-nav-icon.patch` (the skill handbook icon). Installing this package without the update plugin leaves the row on the default gear.
 
 ## What it does
 
@@ -28,7 +28,25 @@ Restart `dsh web`, then open Settings → **MCP / Skills**. The page switches MC
 - Project MCP: mounted in that session's agent scope and disposed with the session
 - A project that turns a global MCP off masks those tools with `tools.restrict` (the stdio process stays until it is off globally too)
 
-Do not commit secrets. `envFrom` in `server.yml` copies process environment names.
+## Secrets (this machine only)
+
+Keep tokens on this machine. Do not commit them, do not put them in `kit/mcp/*/server.yml`, and do not put them on the Settings page. `envFrom` in `server.yml` names variables only; at start the plugin copies those values from the DSH process environment into the MCP child.
+
+Write `$DSH_HOME/.env` (default `~/.dsh/.env`) and `chmod 600` it:
+
+```
+GITHUB_TOKEN=ghp_…
+CONTEXT7_API_KEY=…
+```
+
+Restart `dsh web` after editing. A one-shot override also works: `GITHUB_TOKEN=… CONTEXT7_API_KEY=… dsh web`.
+
+| Variable | Used by | Where to get it |
+|---|---|---|
+| `GITHUB_TOKEN` | GitHub MCP (copied into the child’s `GITHUB_PERSONAL_ACCESS_TOKEN`) | A GitHub PAT with at least `repo` |
+| `CONTEXT7_API_KEY` | Context7 MCP, optional; the server still runs at a lower rate limit without it | [context7.com/dashboard](https://context7.com/dashboard) |
+
+`$DSH_HOME/.credentials.yaml` stores model API keys. This plugin does not read that file.
 
 Optional config:
 
