@@ -15,8 +15,11 @@ describe('loadCatalog', () => {
     assert.ok(catalog.servers.playwright.command)
     assert.equal(catalog.servers.playwright.transport, 'stdio')
     assert.equal(catalog.servers.playwright.serverName, 'playwright')
+    assert.equal(catalog.servers.github.serverName, 'github')
+    assert.equal(catalog.servers.context7.serverName, 'context7')
     assert.equal(catalog.skillBodies.officecli.name, 'officecli')
     assert.ok(catalog.skillBodies.officecli.content.includes('officecli'))
+    assert.equal(catalog.skillBodies['ui-ux-pro-max'].name, 'ui-ux-pro-max')
   })
 })
 

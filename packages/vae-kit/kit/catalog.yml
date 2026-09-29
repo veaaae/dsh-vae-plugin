@@ -13,6 +13,16 @@ mcp:
     description: Browser automation for the current repository.
     default: project
     tags: [browser]
+  github:
+    title: GitHub
+    description: Issues, pull requests, and repository operations through the GitHub MCP server.
+    default: off
+    tags: [vcs]
+  context7:
+    title: Context7
+    description: Up-to-date library documentation and code examples from Context7.
+    default: off
+    tags: [docs]
 
 skills:
   officecli:
@@ -20,3 +30,8 @@ skills:
     description: Create, inspect, and edit Word, Excel, and PowerPoint files through the officecli CLI.
     default: global
     tags: [office]
+  ui-ux-pro-max:
+    title: UI UX Pro Max
+    description: Design intelligence for web, mobile, and desktop UI — styles, palettes, typography, and stack-specific guidance.
+    default: global
+    tags: [design]

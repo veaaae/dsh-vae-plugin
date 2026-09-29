@@ -34,4 +34,4 @@ pnpm dsh plugin --profile web add /home/dsh-vae-plugin/packages/vae-kit
 
 装完重启 `dsh web`，打开设置 → **MCP / Skills**。
 
-当前货架：Playwright（MCP，建议按仓库开）和 officecli（Skill，建议所有会话开）。
+当前货架：Playwright（MCP，建议按仓库开）、GitHub 与 Context7（MCP，默认关，密钥走环境变量）、officecli 与 UI UX Pro Max（Skill，建议所有会话开）。

@@ -4,11 +4,25 @@
 # @playwright/mcp launches a headless browser when DISPLAY is absent, and the
 # dsh web service has no DISPLAY of its own. WSLg serves X11 as :0, so this is
 # what keeps each session's browser visible on the Windows desktop.
+#
+# Two things below are deliberate; changing either one breaks startup:
+#
+# 1. The version is pinned. With '@latest', a publish can (and did) change the
+#    default browser channel and the required Chromium build, which fails the
+#    launch with "Chromium distribution 'chrome' is not found" or
+#    "Executable doesn't exist at .../chromium-<rev>". Bump this on purpose,
+#    then run: npx playwright install chromium
+#
+# 2. --browser chromium is explicit. The default is the chrome *channel*, which
+#    needs a real Google Chrome under /opt/google/chrome and, when running as
+#    root, additionally --no-sandbox. The bundled Chromium needs neither.
 serverName: playwright
 transport: stdio
 command: npx
 args:
   - -y
-  - '@playwright/mcp@latest'
+  - '@playwright/mcp@0.0.83'
+  - '--browser'
+  - chromium
 env:
   DISPLAY: ':0'

@@ -98,7 +98,30 @@ describe('apply', () => {
     assert.equal(ctx.providers[0].name, 'vae-kit')
     const skills = await ctx.providers[0].list({ cwd: dshHome })
     assert.ok(skills.some(skill => skill.name === 'officecli'))
+    assert.ok(skills.some(skill => skill.name === 'ui-ux-pro-max'))
     assert.equal(ctx.plugins.length, 0)
+  })
+
+  it('does not treat the DSH home as a project workspace', async () => {
+    const dshHome = await mkdtemp(join(tmpdir(), 'vae-kit-'))
+    const ctx = fakeContext()
+    const originalGet = ctx.get.bind(ctx)
+    ctx.get = (name) => {
+      if (name === 'workspaceRegistry') {
+        return { list: () => [{ path: dshHome, title: 'root' }] }
+      }
+      return originalGet(name)
+    }
+    apply(ctx, { kitRoot, dshHome }, stubMcp)
+    const enable = ctx.routes.get(`POST ${ENABLE_PATH}`)
+    await enable.fetch(new Request('http://dsh.local/api/vae-kit.enable', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'mcp', id: 'playwright', scope: 'global', value: 'on' }),
+    }))
+    const body = await waitUntil(ctx.routes.get(`GET ${STATE_PATH}`), view => view.mcp.find(item => item.id === 'playwright').effective === 'global')
+    assert.equal(body.projectRoot, null)
+    assert.deepEqual(body.projects, [])
+    assert.equal(body.mcp.find(item => item.id === 'playwright').effective, 'global')
   })
 
   it('writes a global switch and hides a default-on skill', async () => {

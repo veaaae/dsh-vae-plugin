@@ -1,0 +1,11 @@
+# Official GitHub MCP via the npm stdio server. Put GITHUB_TOKEN in the
+# process environment — never commit it. The child still receives
+# GITHUB_PERSONAL_ACCESS_TOKEN, which is what the server reads.
+serverName: github
+transport: stdio
+command: npx
+args:
+  - -y
+  - '@modelcontextprotocol/server-github'
+envFrom:
+  GITHUB_PERSONAL_ACCESS_TOKEN: GITHUB_TOKEN

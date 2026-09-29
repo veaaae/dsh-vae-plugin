@@ -34,4 +34,4 @@ pnpm dsh plugin --profile web add /home/dsh-vae-plugin/packages/vae-kit
 
 Restart `dsh web`, then open Settings → **MCP / Skills**.
 
-The catalog currently ships Playwright (MCP, suggested per repo) and officecli (Skill, suggested for every session).
+The catalog currently ships Playwright (MCP, suggested per repo), GitHub and Context7 (MCP, off until a file turns them on; tokens stay in the environment), officecli, and UI UX Pro Max (Skills, suggested for every session).
